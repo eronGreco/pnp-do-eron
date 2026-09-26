@@ -1,0 +1,204 @@
+diff --git a/src/cut/geometry.ts b/src/cut/geometry.ts
+index d143bce..19d81e0 100644
+--- a/src/cut/geometry.ts
++++ b/src/cut/geometry.ts
+@@ -7,6 +7,15 @@ import { su } from "./silhouetteUnits";
+ export const REG_INSET_MM = 10;
+ export const REG_SQUARE_MM = 5;
+ export const REG_ARM_MM = 10;
++/** Faixa aceita para o braco do L em modo experimental (nao validado). */
++export const REG_ARM_MIN_MM = 10;
++export const REG_ARM_MAX_MM = 20;
++
++/** Braco do L efetivo: padrao validado de 10 mm, ou valor experimental limitado. */
++export function clampRegArmMm(value: number | undefined | null): number {
++  if (typeof value !== "number" || !Number.isFinite(value)) return REG_ARM_MM;
++  return Math.min(REG_ARM_MAX_MM, Math.max(REG_ARM_MIN_MM, Math.round(value * 2) / 2));
++}
+ export const REG_THICKNESS_MM = 1;
+ export const REG_SPACING_X_MM = 277;
+ export const REG_SPACING_Y_MM = 190;
+@@ -35,10 +44,14 @@ export function rectsIntersect(a: Rect, b: Rect, eps = 1e-6): boolean {
+  * Quadrado 5x5 no topo esquerdo, L de 10 mm no topo direito e no rodape esquerdo,
+  * espessura 1 mm, inset 10 mm.
+  */
+-export function registrationShapesMm(pageWidthMm: number, pageHeightMm: number): Rect[] {
++export function registrationShapesMm(
++  pageWidthMm: number,
++  pageHeightMm: number,
++  armMm: number = REG_ARM_MM,
++): Rect[] {
+   const i = REG_INSET_MM;
+   const t = REG_THICKNESS_MM;
+-  const arm = REG_ARM_MM;
++  const arm = clampRegArmMm(armMm);
+ 
+   const trX = pageWidthMm - i;
+   const blY = pageHeightMm - i;
+@@ -60,7 +73,9 @@ export function registrationWhiteBackdropsMm(
+   pageWidthMm: number,
+   pageHeightMm: number,
+   borderMm: number,
++  armMm: number = REG_ARM_MM,
+ ): Rect[] {
++  const arm = clampRegArmMm(armMm);
+   const border = Math.max(0, borderMm);
+   const expanded = (shape: Rect): Rect =>
+     rect(
+@@ -70,30 +85,24 @@ export function registrationWhiteBackdropsMm(
+       Math.min(pageHeightMm, shape.y1 + border),
+     );
+ 
+-  const shapes = registrationShapesMm(pageWidthMm, pageHeightMm);
+-
+-  // O quadrado ganha um fundo quadrado que cobre a mesma area pontilhada
+-  // da zona do sensor (inset + braco + borda), centrada na marca.
+-  const i = REG_INSET_MM;
+-  const squareBackdrop = rect(
+-    Math.max(0, i - border),
+-    Math.max(0, i - border),
+-    Math.min(pageWidthMm, i + REG_ARM_MM + border),
+-    Math.min(pageHeightMm, i + REG_ARM_MM + border),
+-  );
++  const shapes = registrationShapesMm(pageWidthMm, pageHeightMm, arm);
+ 
+-  // Cada braco dos L recebe seu proprio contorno. Assim, as marcas em L
+-  // continuam com formato de L, em vez de ganharem um fundo retangular.
+-  return [squareBackdrop, ...shapes.slice(1).map(expanded)];
++  // Todas as marcas (quadrado e bracos dos L) recebem exatamente a borda
++  // escolhida em volta do proprio desenho. Com borda 0, nao ha fundo extra.
++  return shapes.map(expanded);
+ }
+ 
+ /**
+  * Area em que o sensor procura cada marca. Invadir isso e apenas AVISO.
+  */
+-export function sensorSafeZonesMm(pageWidthMm: number, pageHeightMm: number): Rect[] {
++export function sensorSafeZonesMm(
++  pageWidthMm: number,
++  pageHeightMm: number,
++  armMm: number = REG_ARM_MM,
++): Rect[] {
+   const pad = 6;
+   const i = REG_INSET_MM;
+-  const arm = REG_ARM_MM;
++  const arm = clampRegArmMm(armMm);
+ 
+   return [
+     rect(i - pad, i - pad, i + arm + pad, i + arm + pad),
+@@ -106,8 +115,9 @@ export function artInSensorSafeZone(
+   artRect: Rect,
+   pageWidthMm: number,
+   pageHeightMm: number,
++  armMm: number = REG_ARM_MM,
+ ): boolean {
+-  return sensorSafeZonesMm(pageWidthMm, pageHeightMm).some((z) => rectsIntersect(artRect, z));
++  return sensorSafeZonesMm(pageWidthMm, pageHeightMm, armMm).some((z) => rectsIntersect(artRect, z));
+ }
+ 
+ /**
+@@ -118,8 +128,9 @@ export function cutRectHitsRegistrationMark(
+   cutRect: Rect,
+   pageWidthMm: number,
+   pageHeightMm: number,
++  armMm: number = REG_ARM_MM,
+ ): boolean {
+-  return registrationShapesMm(pageWidthMm, pageHeightMm).some((m) =>
++  return registrationShapesMm(pageWidthMm, pageHeightMm, armMm).some((m) =>
+     rectsIntersect(cutRect, m),
+   );
+ }
+@@ -133,8 +144,9 @@ export function cutRectHitsRegistrationArea(
+   pageWidthMm: number,
+   pageHeightMm: number,
+   whiteBorderMm: number,
++  armMm: number = REG_ARM_MM,
+ ): boolean {
+-  return registrationWhiteBackdropsMm(pageWidthMm, pageHeightMm, whiteBorderMm).some((area) =>
++  return registrationWhiteBackdropsMm(pageWidthMm, pageHeightMm, whiteBorderMm, armMm).some((area) =>
+     rectsIntersect(cutRect, area),
+   );
+ }
+@@ -218,3 +230,11 @@ export function registrationTb123(page: { widthMm: number; heightMm: number }):
+   const spacing = registrationSpacingMm(page);
+   return `TB123,${su(spacing.yMm)},${su(spacing.xMm)},118,118`;
+ }
++
++/**
++ * Comando TB51 (comprimento do braco da marca, em unidades da maquina).
++ * Com o padrao de 10 mm resulta em "TB51,200", identico ao protocolo congelado.
++ */
++export function registrationTb51(armMm: number = REG_ARM_MM): string {
++  return `TB51,${su(clampRegArmMm(armMm))}`;
++}
+diff --git a/src/help/helpTopics.ts b/src/help/helpTopics.ts
+index 5e316f4..64eafed 100644
+--- a/src/help/helpTopics.ts
++++ b/src/help/helpTopics.ts
+@@ -641,6 +641,8 @@ export const HELP_TOPICS = {
+       "Confira se o SVG ficou no tamanho real em milímetros.",
+       "Use Print Then Cut e escolha salvar em PDF em vez de imprimir direto.",
+       "Importe esse PDF de volta no PNP do Eron para usar as mesmas marcas nas cartas.",
++      "Não precisa apagar o contorno de corte do PDF: o sistema usa esse desenho para alinhar as marcas às cartas.",
++      "O Design Space põe o desenho no canto, e aqui as cartas ficam no centro. O sistema move as marcas junto, mantendo a mesma distância entre marca e corte.",
+     ],
+     avoid:
+       "Não edite a posição, o tamanho nem a rotação do SVG depois de gerar o PDF de marcas. Se mexer, gere o pacote novamente.",
+diff --git a/src/pdf/jobManifest.ts b/src/pdf/jobManifest.ts
+index 69368e7..4ec5b06 100644
+--- a/src/pdf/jobManifest.ts
++++ b/src/pdf/jobManifest.ts
+@@ -31,6 +31,8 @@ type MSheet = {
+   a?: "g";
+   r?: 1;
+   q?: "b";
++  /** Braco do L experimental, em mm. */
++  m?: number;
+   c: MCard[];
+ };
+ 
+@@ -94,6 +96,7 @@ export function encodeJobManifest(sheets: Sheet[], settings?: CutSettings): string {
+       if (sheet.assemblyMode === "gutterfold") out.a = "g";
+       if (sheet.rotated) out.r = 1;
+       if (sheet.registrationSide === "back") out.q = "b";
++      if (sheet.registrationArmMm && sheet.registrationArmMm !== 10) out.m = r2(sheet.registrationArmMm);
+       return out;
+     }),
+   };
+@@ -118,6 +121,7 @@ export function decodeJobManifestString(value: string | null | undefined): JobManifest | null {
+       pageHeightMm: sheet.h,
+       rotated: sheet.r === 1,
+       registrationSide: sheet.q === "b" ? "back" : "front",
++      ...(typeof sheet.m === "number" ? { registrationArmMm: sheet.m } : {}),
+       cards: sheet.c.map<Card>((card) => {
+         const out: Card = {
+           id: `s${sheet.n}-c${card.n}`,
+diff --git a/src/routes/index.tsx b/src/routes/index.tsx
+index a3031db..490682d 100644
+--- a/src/routes/index.tsx
++++ b/src/routes/index.tsx
+@@ -76,7 +76,7 @@ function Studio() {
+   const update = useAppUpdate();
+ 
+   // Mudou acabamento ou marcas: a prévia da montagem aparece na hora.
+-  const marksKey = `${composer.config.finishMode}|${composer.config.assemblyMode}|${composer.config.gutterfoldLayout}|${composer.config.gutterfoldDirection}|${composer.config.gutterfoldGapMm}|${composer.config.cameoRegistrationSide}|${JSON.stringify(composer.config.manualMarks)}`;
++  const marksKey = `${composer.config.finishMode}|${composer.config.assemblyMode}|${composer.config.gutterfoldLayout}|${composer.config.gutterfoldDirection}|${composer.config.gutterfoldGapMm}|${composer.config.cameoRegistrationSide}|${composer.config.cameoMarkArmCustom}|${composer.config.cameoMarkArmMm}|${JSON.stringify(composer.config.manualMarks)}`;
+   const firstMarksKey = useRef(marksKey);
+   useEffect(() => {
+     if (marksKey === firstMarksKey.current) return;
+@@ -100,6 +100,7 @@ function Studio() {
+             sheet?.pageWidthMm ?? 297,
+             sheet?.pageHeightMm ?? 210,
+             workspace.registrationWhiteBorderMm,
++            sheet?.registrationArmMm,
+           )
+         : card.hitsRegistrationMark,
+     );
+@@ -134,6 +135,7 @@ function Studio() {
+     void cameo.cut({
+       sheet: sheet.number,
+       ...(page ? { sheetWidthMm: page.widthMm, sheetHeightMm: page.heightMm } : {}),
++      ...(sheet.registrationArmMm ? { markArmMm: sheet.registrationArmMm } : {}),
+       cards: selectedCards.map((card) => card.cutRectMm),
+       settings,
+     });
