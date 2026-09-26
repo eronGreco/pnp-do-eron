@@ -1,0 +1,346 @@
+diff --git a/src/components/panels/SheetPanel.tsx b/src/components/panels/SheetPanel.tsx
+index d16178f..0352ee1 100644
+--- a/src/components/panels/SheetPanel.tsx
++++ b/src/components/panels/SheetPanel.tsx
+@@ -65,6 +65,10 @@ export function SheetPanel({
+   const packing = effectivePacking(config);
+   const ack = config.cameoCustomSheetAck;
+   const a3Allowed = paperAllowed("a3", config.finishMode, ack);
++  const a5Allowed = paperAllowed("a5", config.finishMode, ack);
++  const cartaAllowed = paperAllowed("carta", config.finishMode, ack);
++  const polasealAllowed = paperAllowed("polaseal", config.finishMode, ack);
++  const oficioAllowed = paperAllowed("oficio", config.finishMode, ack);
+   const customAllowed = paperAllowed("custom", config.finishMode, ack);
+   const retratoAllowed = orientationAllowed("retrato", config.finishMode, ack);
+   const page = pageSizeMm(config);
+@@ -109,6 +113,18 @@ export function SheetPanel({
+               <SelectItem value="a3" disabled={!a3Allowed}>
+                 {PAPER_LABELS.a3}
+               </SelectItem>
++              <SelectItem value="a5" disabled={!a5Allowed}>
++                {PAPER_LABELS.a5}
++              </SelectItem>
++              <SelectItem value="carta" disabled={!cartaAllowed}>
++                {PAPER_LABELS.carta}
++              </SelectItem>
++              <SelectItem value="polaseal" disabled={!polasealAllowed}>
++                {PAPER_LABELS.polaseal}
++              </SelectItem>
++              <SelectItem value="oficio" disabled={!oficioAllowed}>
++                {PAPER_LABELS.oficio}
++              </SelectItem>
+               <SelectItem value="custom" disabled={!customAllowed}>
+                 {PAPER_LABELS.custom}
+               </SelectItem>
+@@ -143,6 +159,7 @@ export function SheetPanel({
+             </div>
+           </DisabledConfig>
+ 
++          {config.paperSize !== "custom" && (
+           <Select
+             value={config.orientation}
+             onValueChange={(value) =>
+@@ -159,6 +176,7 @@ export function SheetPanel({
+               </SelectItem>
+             </SelectContent>
+           </Select>
++          )}
+         </div>
+         <p className="text-[10px] text-muted-foreground">
+           Folha em uso: {page.widthMm} por {page.heightMm} mm. Imprima sempre em escala de 100%.
+diff --git a/src/composer/buildSheetPdf.ts b/src/composer/buildSheetPdf.ts
+index 9873729..5a86dcc 100644
+--- a/src/composer/buildSheetPdf.ts
++++ b/src/composer/buildSheetPdf.ts
+@@ -12,7 +12,7 @@ import {
+   type PDFPage,
+ } from "pdf-lib";
+ import type { Card, CutSettings, Rect, Sheet } from "@/cameo/types";
+-import { templatePageForSheet, type CricutMarksTemplate } from "@/cricut/markTemplate";
++import { cricutDesignSizeMismatch, cricutMarkOffsetMm, templatePageForSheet, type CricutMarksTemplate } from "@/cricut/markTemplate";
+ import {
+   artInSensorSafeZone,
+   cutRectHitsRegistrationArea,
+@@ -39,6 +39,7 @@ import {
+ import { pageSizeMm } from "./paperSizes";
+ import { backImageFor } from "./pairFrontBack";
+ import type { ComposerCard, ComposerConfig, ComposerImage } from "./types";
++import { cameoMarkArmMm } from "./types";
+ 
+ export type ComposedDocument = {
+   bytes: ArrayBuffer;
+@@ -90,6 +91,7 @@ export async function buildSheetPdf(
+   const doc = await PDFDocument.create();
+   const sheetSize = pageSizeMm(config);
+   const pageW = sheetSize.widthMm;
++  const markArm = cameoMarkArmMm(config);
+   const pageH = sheetSize.heightMm;
+   const box = (r: Rect) => boxOn(r, pageH);
+   const beginClip = (page: PDFPage, r: Rect) => beginClipOn(page, r, pageH);
+@@ -170,8 +172,9 @@ export async function buildSheetPdf(
+             : placement.clipRectMm,
+           pageW,
+           pageH,
++          markArm,
+         ) ||
+-          (backClip ? artInSensorSafeZone(backClip, pageW, pageH) : false));
++          (backClip ? artInSensorSafeZone(backClip, pageW, pageH, markArm) : false));
+       const hitsMark =
+         cameoMode &&
+         cutRectHitsRegistrationArea(
+@@ -179,6 +182,7 @@ export async function buildSheetPdf(
+           pageW,
+           pageH,
+           config.registrationWhiteBorderMm,
++          markArm,
+         );
+ 
+       if (inSafeZone) {
+@@ -242,11 +246,12 @@ export async function buildSheetPdf(
+         pageW,
+         pageH,
+         config.registrationWhiteBorderMm,
++        markArm,
+       )) {
+         front.drawRectangle({ ...box(backdrop), color: rgb(1, 1, 1) });
+       }
+ 
+-      for (const shape of registrationShapesMm(pageW, pageH)) {
++      for (const shape of registrationShapesMm(pageW, pageH, markArm)) {
+         front.drawRectangle({ ...box(shape), color: rgb(0, 0, 0) });
+       }
+     }
+@@ -261,9 +266,16 @@ export async function buildSheetPdf(
+           markImage = await doc.embedPng(markPage.bytes.slice(0));
+           embeddedCricutMarks.set(markPage.sheetNumber, markImage);
+         }
++        const offset = cricutMarkOffsetMm(markPage, layout, config);
++        if (cricutDesignSizeMismatch(markPage, layout, config)) {
++          warnings.push(`Folha ${layout.number}: o desenho no PDF da Cricut tem outro tamanho. Confira se o SVG foi redimensionado no Design Space.`);
++        }
++        if (!markPage.designRectMm) {
++          warnings.push(`Folha ${layout.number}: não achei a área do desenho no PDF da Cricut. Confira a primeira impressão.`);
++        }
+         front.drawImage(markImage, {
+-          x: 0,
+-          y: 0,
++          x: mmToPt(offset.dx),
++          y: mmToPt(-offset.dy),
+           width: mmToPt(pageW),
+           height: mmToPt(pageH),
+         });
+@@ -310,6 +322,7 @@ export async function buildSheetPdf(
+         pageHeightMm: pageH,
+         cards: sheetCards,
+         rotated: false,
++        ...(config.finishMode === "cameo" ? { registrationArmMm: markArm } : {}),
+       });
+       continue;
+     }
+@@ -335,10 +348,11 @@ export async function buildSheetPdf(
+         pageW,
+         pageH,
+         config.registrationWhiteBorderMm,
++        markArm,
+       )) {
+         back.drawRectangle({ ...box(backdrop), color: rgb(1, 1, 1) });
+       }
+-      for (const shape of registrationShapesMm(pageW, pageH)) {
++      for (const shape of registrationShapesMm(pageW, pageH, markArm)) {
+         back.drawRectangle({ ...box(shape), color: rgb(0, 0, 0) });
+       }
+     }
+@@ -361,7 +375,7 @@ export async function buildSheetPdf(
+       cards: sheetCards,
+       rotated: false,
+       ...(config.finishMode === "cameo"
+-        ? { registrationSide: config.cameoRegistrationSide }
++        ? { registrationSide: config.cameoRegistrationSide, registrationArmMm: markArm }
+         : {}),
+     });
+   }
+diff --git a/src/composer/layoutSheets.ts b/src/composer/layoutSheets.ts
+index f229c02..a5d21a8 100644
+--- a/src/composer/layoutSheets.ts
++++ b/src/composer/layoutSheets.ts
+@@ -9,6 +9,7 @@ import { manualMarkMarginMm } from "@/cut/manualMarks";
+ import { pageSizeMm } from "./paperSizes";
+ import { effectivePacking } from "./packingPolicy";
+ import type { ComposerCard, ComposerConfig } from "./types";
++import { cameoMarkArmMm } from "./types";
+ 
+ export type PlacedCard = {
+   card: ComposerCard;
+@@ -157,7 +158,7 @@ const MARK_CLEARANCE_MM = 1;
+ function blockedAreas(config: ComposerConfig): Rect[] {
+   if (config.finishMode !== "cameo") return [];
+   const page = pageSizeMm(config);
+-  return registrationShapesMm(page.widthMm, page.heightMm).map((mark) =>
++  return registrationShapesMm(page.widthMm, page.heightMm, cameoMarkArmMm(config)).map((mark) =>
+     rect(
+       Math.max(0, mark.x0 - MARK_CLEARANCE_MM),
+       Math.max(0, mark.y0 - MARK_CLEARANCE_MM),
+diff --git a/src/composer/markCoverage.ts b/src/composer/markCoverage.ts
+index 6dcb05c..28e717f 100644
+--- a/src/composer/markCoverage.ts
++++ b/src/composer/markCoverage.ts
+@@ -10,6 +10,7 @@ import {
+ } from "./layoutSheets";
+ import { pageSizeMm } from "./paperSizes";
+ import type { ComposerCard, ComposerConfig } from "./types";
++import { cameoMarkArmMm } from "./types";
+ 
+ /**
+  * A faixa branca ao redor de cada marca do sensor e obrigatoria: sem ela a
+@@ -45,6 +46,7 @@ function backdrops(config: ComposerConfig): Rect[] {
+     page.widthMm,
+     page.heightMm,
+     config.registrationWhiteBorderMm,
++    cameoMarkArmMm(config),
+   );
+ }
+ 
+diff --git a/src/composer/paperSizes.ts b/src/composer/paperSizes.ts
+index a43fc93..7c2d9f1 100644
+--- a/src/composer/paperSizes.ts
++++ b/src/composer/paperSizes.ts
+@@ -1,7 +1,14 @@
+ import { A4_LANDSCAPE_H_MM, A4_LANDSCAPE_W_MM } from "@/cut/geometry";
+ 
+ /** Tamanhos de folha suportados na montagem. */
+-export type PaperSize = "a4" | "a3" | "custom";
++export type PaperSize =
++  | "a4"
++  | "a3"
++  | "a5"
++  | "carta"
++  | "oficio"
++  | "polaseal"
++  | "custom";
+ 
+ /** Orientacao da folha. Retrato vale apenas no acabamento guilhotina. */
+ export type PaperOrientation = "paisagem" | "retrato";
+@@ -18,14 +25,25 @@ export const DEFAULT_CUSTOM_HEIGHT_MM = 210;
+ 
+ export type PageSizeMm = { widthMm: number; heightMm: number };
+ 
+-export const PAPER_SIZES: Record<"a4" | "a3", PageSizeMm> = {
++export const PAPER_SIZES: Record<Exclude<PaperSize, "custom">, PageSizeMm> = {
+   a4: { widthMm: A4_LANDSCAPE_W_MM, heightMm: A4_LANDSCAPE_H_MM },
+   a3: { widthMm: A3_LANDSCAPE_W_MM, heightMm: A3_LANDSCAPE_H_MM },
++  a5: { widthMm: 210, heightMm: 148 },
++  carta: { widthMm: 279, heightMm: 216 },
++  oficio: { widthMm: 356, heightMm: 216 },
++  // Bolsa de plastificacao A4 padrao do mercado brasileiro (Polaseal e
++  // equivalentes, 220 x 307 mm), muito usada em PnP para plastificar as
++  // folhas antes do corte.
++  polaseal: { widthMm: 220, heightMm: 307 },
+ };
+ 
+ export const PAPER_LABELS: Record<PaperSize, string> = {
+   a4: "A4 (297 × 210 mm)",
+   a3: "A3 (420 × 297 mm)",
++  a5: "A5 (210 × 148 mm)",
++  carta: "Carta (279 × 216 mm)",
++  oficio: "Ofício (356 × 216 mm)",
++  polaseal: "Polaseal A4 (220 × 307 mm)",
+   custom: "Personalizada (você escolhe)",
+ };
+ 
+@@ -50,8 +68,10 @@ type PaperConfig = {
+ };
+ 
+ /**
+- * A folha A3 vale apenas para guilhotina: a Cameo 4 corta materiais de ate
+- * cerca de 30,5 cm de largura.
++ * A3 e Oficio valem apenas na guilhotina e na Cricut: a Cameo 4 corta
++ * materiais de ate cerca de 30,5 cm de largura. A5, Carta e Polaseal A4
++ * (220 x 307 mm) cabem na Cameo, mas seguem o aviso experimental da folha
++ * personalizada.
+  *
+  * A folha personalizada vale sempre na guilhotina e, na Cameo, somente depois
+  * de o usuario aceitar o aviso: as marcas do sensor e a leitura foram
+@@ -64,7 +84,10 @@ export function paperAllowed(
+ ): boolean {
+   if (paper === "a4") return true;
+   if (finishMode === "manual" || finishMode === "cricut") return true;
+-  return paper === "custom" && cameoCustomSheetAck;
++  // Na Cameo, folhas que cabem na largura util da maquina valem com o aviso
++  // aceito; A3 e Oficio sao largas demais e seguem bloqueadas.
++  if (paper === "a3" || paper === "oficio") return false;
++  return cameoCustomSheetAck;
+ }
+ 
+ /**
+@@ -93,6 +116,10 @@ export function pageSizeMm(config: PaperConfig): PageSizeMm {
+         }
+       : PAPER_SIZES[effective];
+ 
++  // Na folha personalizada, largura e altura valem exatamente como digitadas:
++  // a orientacao nao troca os valores de lugar.
++  if (effective === "custom") return base;
++
+   const orientation = config.orientation ?? "paisagem";
+   if (
+     orientation === "retrato" &&
+diff --git a/src/composer/sizeAudit.ts b/src/composer/sizeAudit.ts
+index 9790578..4fe9fb6 100644
+--- a/src/composer/sizeAudit.ts
++++ b/src/composer/sizeAudit.ts
+@@ -18,6 +18,7 @@ import {
+ } from "./layoutSheets";
+ import { pageSizeMm } from "./paperSizes";
+ import type { ComposerConfig } from "./types";
++import { cameoMarkArmMm } from "./types";
+ 
+ /** Diferenca aceita entre o tamanho pedido e o tamanho real do corte. */
+ export const SIZE_TOLERANCE_MM = 0.05;
+@@ -132,6 +133,7 @@ export function auditCutSizes(
+           page.widthMm,
+           page.heightMm,
+           config.registrationWhiteBorderMm,
++          cameoMarkArmMm(config),
+         )
+       ) {
+         issues.push({
+diff --git a/src/composer/types.ts b/src/composer/types.ts
+index 54a2f40..be0dfa1 100644
+--- a/src/composer/types.ts
++++ b/src/composer/types.ts
+@@ -1,3 +1,4 @@
++import { clampRegArmMm, REG_ARM_MM } from "@/cut/geometry";
+ import {
+   DEFAULT_MANUAL_MARKS,
+   type FinishMode,
+@@ -84,6 +85,10 @@ export type ComposerConfig = {
+   registrationWhiteBorderMm: number;
+   /** Lado impresso que será carregado virado para cima na Silhouette. */
+   cameoRegistrationSide: CameoRegistrationSide;
++  /** Liga o tamanho experimental do braco do L das marcas da Cameo. */
++  cameoMarkArmCustom: boolean;
++  /** Braco do L em mm quando experimental. O padrao validado e 10 mm. */
++  cameoMarkArmMm: number;
+   /** Forma de montar cada carta na folha. */
+   assemblyMode: AssemblyMode;
+   /** Peças separadas ou a folha inteira dobrada ao meio. */
+@@ -121,6 +126,11 @@ export type ComposerConfig = {
+ 
+ export const BACK_OFFSET_LIMIT_MM = 10;
+ 
++/** Braco do L efetivo das marcas da Cameo: 10 mm validado, salvo modo experimental. */
++export function cameoMarkArmMm(config: Pick<ComposerConfig, "cameoMarkArmCustom" | "cameoMarkArmMm">): number {
++  return config.cameoMarkArmCustom ? clampRegArmMm(config.cameoMarkArmMm) : REG_ARM_MM;
++}
++
+ export const DEFAULT_COMPOSER_CONFIG: ComposerConfig = {
+   paperSize: "a4",
+   orientation: "paisagem",
+@@ -138,6 +148,8 @@ export const DEFAULT_COMPOSER_CONFIG: ComposerConfig = {
+   gridRows: 2,
+   registrationWhiteBorderMm: 6,
+   cameoRegistrationSide: "front",
++  cameoMarkArmCustom: false,
++  cameoMarkArmMm: 10,
+   assemblyMode: "normal",
+   gutterfoldLayout: "piece",
+   gutterfoldDirection: "auto",
