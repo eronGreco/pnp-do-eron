@@ -2,6 +2,20 @@
 
 Ferramenta web para preparar projetos Print & Play para impressão e corte, com foco em cartas, folhas de impressão e integração opcional com plotters de recorte.
 
+## Interface
+
+### Montar cartas
+
+Fluxo de montagem, acabamento e preparação para corte com Silhouette Cameo, Cricut ou guilhotina.
+
+![Montagem de cartas e preparação para corte](docs/screenshots/montar-cartas.webp)
+
+### Fatiar folha
+
+Separação visual de uma folha em cartas individuais, com controle de grade, margens e espaçamento.
+
+![Fatiamento de uma folha em cartas individuais](docs/screenshots/fatiar-folha.webp)
+
 ## O que o projeto faz
 
 - Abre e processa PDFs localmente no navegador.
