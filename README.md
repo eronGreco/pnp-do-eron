@@ -2,6 +2,8 @@
 
 Ferramenta web para preparar projetos Print & Play para impressão e corte, com foco em cartas, folhas de impressão e integração opcional com plotters de recorte.
 
+**🌐 Versão online:** [pnp.eron.dev.br](https://pnp.eron.dev.br/)
+
 ## Interface
 
 ### Montar cartas
@@ -27,6 +29,12 @@ Separação visual de uma folha em cartas individuais, com controle de grade, ma
 - Possui fluxo específico para Silhouette Cameo 4 por meio de um bridge local para Windows.
 - Possui ferramentas auxiliares para Cricut.
 - Pode ser instalado como PWA.
+
+## Acessar o projeto
+
+A versão atualmente publicada está disponível em **[pnp.eron.dev.br](https://pnp.eron.dev.br/)**.
+
+O repositório público contém o código-fonte aberto do projeto e recebe contribuições por Pull Request. Alterações aprovadas passam por validação antes de serem incorporadas à versão publicada.
 
 ## Privacidade
 
