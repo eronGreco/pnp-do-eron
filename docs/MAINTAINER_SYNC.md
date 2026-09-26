@@ -23,3 +23,14 @@ Ao promover mudanças para o repositório privado:
 - rode novamente os testes e o build no repositório privado antes de publicar.
 
 No sentido contrário, mudanças feitas na versão privada devem ser reaplicadas ao repositório público sem carregar arquivos internos, credenciais, histórico privado ou configurações específicas de infraestrutura.
+
+## Controle de sincronização
+
+Último snapshot promovido do repositório de publicação:
+
+- Data: `2026-09-26`
+- Commit de origem: `1f679fa86b476a91d3b259c8c4ac9151c9d7f1ce`
+- Pull Request público: `#1`
+- Commit público resultante: `b2fd8988b1efd15cd7265f9385960d462af2b8ed`
+
+Na próxima sincronização do privado para o público, use o commit de origem acima como base da comparação e atualize este bloco depois que o novo lote for validado e incorporado.
