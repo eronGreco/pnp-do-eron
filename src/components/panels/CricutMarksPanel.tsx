@@ -62,8 +62,8 @@ export function CricutMarksPanel({
 
       <div className="grid grid-cols-[24px_1fr] gap-x-2 gap-y-2 text-[11px]">
         <Step n="1" text="Baixe o Pacote Cricut com o SVG de corte." />
-        <Step n="2" text="Abra o SVG no Design Space e mantenha o tamanho real." />
-        <Step n="3" text="Use Print Then Cut e salve o PDF com as marcas." />
+        <Step n="2" text="Abra o SVG no Design Space sem mudar tamanho nem posição." />
+        <Step n="3" text="Use Print Then Cut e salve o PDF com as marcas, sem editar. Pode deixar o contorno de corte: ele ajuda a alinhar." />
         <Step n="4" text={`Importe esse PDF aqui antes de montar ${gutterfold ? "as peças" : "as cartas"}.`} />
       </div>
 
@@ -100,7 +100,19 @@ export function CricutMarksPanel({
           </div>
           <p className="text-[10px] leading-snug text-muted-foreground">
             {cricutMarks.pages.length} página(s) com marcas detectadas. PDF: {fmt(cricutMarks.pageWidthMm)} por {fmt(cricutMarks.pageHeightMm)} mm.
+            {cricutMarks.pages[0]?.corners && ` Cantos lidos: ${cricutMarks.pages[0].corners.length} de 4.`}
           </p>
+          {cricutMarks.pages[0]?.designRectMm ? (
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              As marcas acompanham as cartas: a posição do desenho no Design Space foi lida e a prévia mostra essa área tracejada.
+            </p>
+          ) : (
+            <p className="rounded-md border border-warning/60 bg-warning/10 px-2 py-1.5 text-[10px] leading-snug text-warning">
+              {cricutMarks.pages[0]?.corners
+                ? "Não achei a área do desenho no PDF. As marcas ficam na posição original; confira a primeira impressão."
+                : "Molde importado numa versão antiga. Importe o PDF de novo para alinhar as marcas às cartas."}
+            </p>
+          )}
           {!matches && (
             <p className="rounded-md border border-warning/60 bg-warning/10 px-2 py-1.5 text-[10px] leading-snug text-warning">
               {gutterfold ? "As peças" : "As cartas"}, a folha ou o raio mudaram depois desse molde. Gere outro SVG no Design Space e importe o PDF novo.

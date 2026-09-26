@@ -23,52 +23,62 @@ function isDark(data: Uint8ClampedArray, offset: number): boolean {
   return r * 0.299 + g * 0.587 + b * 0.114 < 120;
 }
 
-function inCornerSearchZone(x: number, y: number, width: number, height: number): boolean {
-  const left = x < width * 0.24;
-  const right = x > width * 0.76;
-  const top = y < height * 0.2;
-  const bottom = y > height * 0.8;
-  return (left || right) && (top || bottom);
-}
+type Corner = "TL" | "TR" | "BL" | "BR";
 
-function nearPageCorner(bounds: CricutMarkBounds, width: number, height: number): boolean {
-  const left = bounds.x0Px < width * 0.12;
-  const right = bounds.x1Px > width * 0.88;
-  const top = bounds.y0Px < height * 0.12;
-  const bottom = bounds.y1Px > height * 0.88;
-  return (left || right) && (top || bottom);
+const CORNER_BAND_MM = 45;
+
+function cornerOf(b: CricutMarkBounds, width: number, height: number, pxPerMm: number): Corner | null {
+  const band = CORNER_BAND_MM * pxPerMm;
+  const edge = 2 * pxPerMm;
+  const left = b.x1Px < band - edge;
+  const right = b.x0Px > width - band + edge;
+  const top = b.y1Px < band - edge;
+  const bottom = b.y0Px > height - band + edge;
+  if (top && left) return "TL";
+  if (top && right) return "TR";
+  if (bottom && left) return "BL";
+  if (bottom && right) return "BR";
+  return null;
 }
 
 /**
- * As marcas da Cricut sao tracos finos. O Design Space costuma preencher de preto
- * o contorno da carta importada, e esse bloco grande nunca e marca.
+ * Marcas da Cricut: braco fino solto, "L" ligado (caixa quadrada mas quase
+ * vazia) ou quadrado preto cheio. Arte de carta e grande e densa demais.
  */
-function markShaped(bounds: CricutMarkBounds, pixels: number, width: number): boolean {
-  const bw = bounds.x1Px - bounds.x0Px;
-  const bh = bounds.y1Px - bounds.y0Px;
-  const thin = Math.min(bw, bh) <= Math.max(6, width * 0.035);
-  const long = Math.max(bw, bh) >= width * 0.015;
-  const area = Math.max(1, bw * bh);
-  const notBlock = pixels / area < 0.98 || thin;
-  return thin && long && notBlock;
+function markShaped(b: CricutMarkBounds, pixels: number, pxPerMm: number): boolean {
+  const bw = (b.x1Px - b.x0Px) / pxPerMm;
+  const bh = (b.y1Px - b.y0Px) / pxPerMm;
+  const long = Math.max(bw, bh);
+  const short = Math.min(bw, bh);
+  const fill = pixels / Math.max(1, (b.x1Px - b.x0Px) * (b.y1Px - b.y0Px));
+  const arm = short <= 3 && long >= 4 && long <= 35;
+  const bracket = long >= 6 && long <= 35 && short >= 6 && fill <= 0.35;
+  const square = long >= 3 && long <= 12 && short / long >= 0.7 && fill >= 0.8;
+  return arm || bracket || square;
 }
 
-function selectedComponents(source: ImageData): Component[] {
+function selectedComponents(
+  source: ImageData,
+  pxPerMm: number,
+): { components: Component[]; corners: Corner[] } {
   const { width, height, data } = source;
   const total = width * height;
+  const band = CORNER_BAND_MM * pxPerMm;
   const candidates = new Uint8Array(total);
   const visited = new Uint8Array(total);
 
   for (let y = 0; y < height; y += 1) {
+    const inY = y < band || y > height - band;
+    if (!inY) continue;
     for (let x = 0; x < width; x += 1) {
+      if (!(x < band || x > width - band)) continue;
       const index = y * width + x;
-      if (inCornerSearchZone(x, y, width, height) && isDark(data, index * 4)) {
-        candidates[index] = 1;
-      }
+      if (isDark(data, index * 4)) candidates[index] = 1;
     }
   }
 
   const components: Component[] = [];
+  const corners = new Set<Corner>();
   const stack: number[] = [];
 
   for (let start = 0; start < total; start += 1) {
@@ -91,7 +101,6 @@ function selectedComponents(source: ImageData): Component[] {
       y0 = Math.min(y0, y);
       x1 = Math.max(x1, x + 1);
       y1 = Math.max(y1, y + 1);
-
       const neighbors = [current - 1, current + 1, current - width, current + width];
       for (const next of neighbors) {
         if (next < 0 || next >= total || visited[next] || !candidates[next]) continue;
@@ -103,20 +112,59 @@ function selectedComponents(source: ImageData): Component[] {
     }
 
     const bounds = { x0Px: x0, y0Px: y0, x1Px: x1, y1Px: y1 };
-    const bw = x1 - x0;
-    const bh = y1 - y0;
-    const longEnough = bw > 28 || bh > 28;
-    if (
-      pixels.length >= 70 &&
-      longEnough &&
-      nearPageCorner(bounds, width, height) &&
-      markShaped(bounds, pixels.length, width)
-    ) {
+    const corner = cornerOf(bounds, width, height, pxPerMm);
+    if (corner && markShaped(bounds, pixels.length, pxPerMm)) {
       components.push({ pixels, bounds });
+      corners.add(corner);
     }
   }
 
-  return components;
+  return { components, corners: [...corners] };
+}
+
+/** Area do desenho: tudo que nao e branco dentro da pagina, fora das marcas. */
+function designRect(
+  source: ImageData,
+  marks: Component[],
+  pxPerMm: number,
+): { x0: number; y0: number; x1: number; y1: number } | null {
+  const { width, height, data } = source;
+  const markMask = new Uint8Array(width * height);
+  const pad = Math.round(pxPerMm * 1);
+  for (const m of marks) {
+    for (let y = Math.max(0, m.bounds.y0Px - pad); y < Math.min(height, m.bounds.y1Px + pad); y += 1) {
+      for (let x = Math.max(0, m.bounds.x0Px - pad); x < Math.min(width, m.bounds.x1Px + pad); x += 1) {
+        markMask[y * width + x] = 1;
+      }
+    }
+  }
+  const inset = Math.round(pxPerMm * 3);
+  const fx0 = Math.min(...marks.map((m) => m.bounds.x0Px)) + inset;
+  const fy0 = Math.min(...marks.map((m) => m.bounds.y0Px)) + inset;
+  const fx1 = Math.max(...marks.map((m) => m.bounds.x1Px)) - inset;
+  const fy1 = Math.max(...marks.map((m) => m.bounds.y1Px)) - inset;
+  let x0 = width;
+  let y0 = height;
+  let x1 = -1;
+  let y1 = -1;
+  for (let y = Math.max(0, fy0); y < Math.min(height, fy1); y += 1) {
+    for (let x = Math.max(0, fx0); x < Math.min(width, fx1); x += 1) {
+      const i = y * width + x;
+      if (markMask[i]) continue;
+      const o = i * 4;
+      const lum = (data[o] ?? 255) * 0.299 + (data[o + 1] ?? 255) * 0.587 + (data[o + 2] ?? 255) * 0.114;
+      if (lum >= 235) continue;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+  }
+  if (x1 < 0) return null;
+  const w = (x1 + 1 - x0) / pxPerMm;
+  const h = (y1 + 1 - y0) / pxPerMm;
+  if (w < 10 || h < 10) return null;
+  return { x0: x0 / pxPerMm, y0: y0 / pxPerMm, x1: (x1 + 1) / pxPerMm, y1: (y1 + 1) / pxPerMm };
 }
 
 function rgbaToPngBytes(canvas: HTMLCanvasElement): Promise<ArrayBuffer> {
@@ -134,7 +182,7 @@ function rgbaToPngBytes(canvas: HTMLCanvasElement): Promise<ArrayBuffer> {
 async function extractPage(
   page: PDFPageProxy,
   sheetNumber: number,
-): Promise<{ markPage: CricutMarkPage | null; widthMm: number; heightMm: number }> {
+): Promise<{ markPage: CricutMarkPage | null; widthMm: number; heightMm: number; corners: Corner[] }> {
   const unit = page.getViewport({ scale: 1 });
   const scale = Math.min(3, Math.max(1, 1500 / unit.width));
   const viewport = page.getViewport({ scale });
@@ -146,10 +194,14 @@ async function extractPage(
   await page.render({ canvas, canvasContext: context, viewport }).promise;
 
   const source = context.getImageData(0, 0, canvas.width, canvas.height);
-  const components = selectedComponents(source);
   const widthMm = (unit.width * 25.4) / 72;
   const heightMm = (unit.height * 25.4) / 72;
-  if (components.length === 0) return { markPage: null, widthMm, heightMm };
+  const pxPerMm = canvas.width / widthMm;
+  const { components, corners } = selectedComponents(source, pxPerMm);
+  if (corners.length < 3) {
+    return { markPage: null, widthMm, heightMm, corners };
+  }
+  const design = designRect(source, components, pxPerMm);
 
   const output = context.createImageData(canvas.width, canvas.height);
   let darkPixels = 0;
@@ -172,7 +224,10 @@ async function extractPage(
   return {
     widthMm,
     heightMm,
+    corners,
     markPage: {
+      corners,
+      designRectMm: design,
       sheetNumber,
       bytes,
       previewUrl: URL.createObjectURL(blob),
@@ -196,6 +251,7 @@ export async function extractCricutMarksFromPdf(
     const pages: CricutMarkPage[] = [];
     let pageWidthMm = 0;
     let pageHeightMm = 0;
+    let bestCorners: Corner[] = [];
 
     for (let index = 0; index < doc.numPages; index += 1) {
       const pdfPage = await doc.getPage(index + 1);
@@ -203,10 +259,22 @@ export async function extractCricutMarksFromPdf(
       pageWidthMm = pageWidthMm || result.widthMm;
       pageHeightMm = pageHeightMm || result.heightMm;
       if (result.markPage) pages.push(result.markPage);
+      else if (result.corners.length > bestCorners.length) bestCorners = result.corners;
     }
 
     if (pages.length === 0) {
-      throw new Error("Não encontrei marcas pretas da Cricut nos cantos do PDF.");
+      const names: Record<Corner, string> = {
+        TL: "superior esquerdo",
+        TR: "superior direito",
+        BL: "inferior esquerdo",
+        BR: "inferior direito",
+      };
+      const missing = (Object.keys(names) as Corner[]).filter((c) => !bestCorners.includes(c));
+      throw new Error(
+        bestCorners.length === 0
+          ? "Não encontrei marcas pretas da Cricut nos cantos do PDF."
+          : `Encontrei marcas só em ${bestCorners.length} canto(s). Faltou o canto ${missing.map((c) => names[c]).join(", ")}. Salve o PDF do Design Space sem editar as marcas.`,
+      );
     }
 
     return {

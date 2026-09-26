@@ -25,6 +25,10 @@ export type CricutMarkPage = {
   heightPx: number;
   darkPixels: number;
   bounds: CricutMarkBounds[];
+  /** Cantos com marca reconhecida (TL, TR, BL, BR). */
+  corners?: string[];
+  /** Area do desenho no PDF do Design Space, em mm da pagina. */
+  designRectMm?: Rect | null;
 };
 
 export type StoredCricutMarkPage = Omit<CricutMarkPage, "previewUrl">;
@@ -132,15 +136,74 @@ export function templatePageForSheet(
   return template.pages.length === 1 && first ? first : null;
 }
 
+/** Retangulo que o SVG de corte ocupa nesta folha (o que o Design Space ve). */
+export function sheetDesignRectMm(
+  layout: ComposerSheetLayout,
+  config: ComposerConfig,
+): Rect | null {
+  const rects: Rect[] = [];
+  for (const placed of layout.placements) {
+    if (!placed.card.selected) continue;
+    if (isGutterfold(config)) {
+      rects.push(placed.frontRectMm ?? placed.cutRectMm, backFaceRect(placed, config));
+    } else {
+      rects.push(placed.cutRectMm);
+    }
+  }
+  if (rects.length === 0) return null;
+  return rect(
+    Math.min(...rects.map((r) => r.x0)),
+    Math.min(...rects.map((r) => r.y0)),
+    Math.max(...rects.map((r) => r.x1)),
+    Math.max(...rects.map((r) => r.y1)),
+  );
+}
+
+/**
+ * O Design Space nao centraliza: ele poe o desenho no canto interno das marcas.
+ * Para manter a relacao marca/corte que a Cricut espera, as marcas sao
+ * deslocadas junto com a area do desenho ate onde as cartas estao aqui.
+ */
+export function cricutMarkOffsetMm(
+  page: CricutMarkPage,
+  layout: ComposerSheetLayout | undefined,
+  config: ComposerConfig,
+): { dx: number; dy: number } {
+  const design = page.designRectMm;
+  const here = layout ? sheetDesignRectMm(layout, config) : null;
+  if (!design || !here) return { dx: 0, dy: 0 };
+  return { dx: here.x0 - design.x0, dy: here.y0 - design.y0 };
+}
+
+/** Diferenca de tamanho entre o desenho do PDF e o SVG daqui (mm). */
+export function cricutDesignSizeMismatch(
+  page: CricutMarkPage,
+  layout: ComposerSheetLayout | undefined,
+  config: ComposerConfig,
+): { pdf: Rect; here: Rect } | null {
+  const design = page.designRectMm;
+  const here = layout ? sheetDesignRectMm(layout, config) : null;
+  if (!design || !here) return null;
+  const dw = Math.abs(design.x1 - design.x0 - (here.x1 - here.x0));
+  const dh = Math.abs(design.y1 - design.y0 - (here.y1 - here.y0));
+  return dw > 2 || dh > 2 ? { pdf: design, here } : null;
+}
+
 export function cricutMarkRectsMm(
   page: CricutMarkPage,
   pageWidthMm: number,
   pageHeightMm: number,
+  offset: { dx: number; dy: number } = { dx: 0, dy: 0 },
 ): Rect[] {
   const sx = pageWidthMm / page.widthPx;
   const sy = pageHeightMm / page.heightPx;
   return page.bounds.map((b) =>
-    rect(b.x0Px * sx, b.y0Px * sy, b.x1Px * sx, b.y1Px * sy),
+    rect(
+      b.x0Px * sx + offset.dx,
+      b.y0Px * sy + offset.dy,
+      b.x1Px * sx + offset.dx,
+      b.y1Px * sy + offset.dy,
+    ),
   );
 }
 
@@ -163,7 +226,7 @@ function coveredByTemplate(
   for (const layout of layouts) {
     const markPage = templatePageForSheet(template, layout.number);
     if (!markPage) continue;
-    const marks = cricutMarkRectsMm(markPage, page.widthMm, page.heightMm);
+    const marks = cricutMarkRectsMm(markPage, page.widthMm, page.heightMm, cricutMarkOffsetMm(markPage, layout, config));
     for (const placed of layout.placements) {
       const contentRects = isGutterfold(config)
         ? [placed.frontRectMm ?? placed.cutRectMm, backFaceRect(placed, config)]
@@ -218,7 +281,7 @@ export function cricutMarkCoverage(
   for (const layout of layouts) {
     const markPage = templatePageForSheet(template, layout.number);
     if (!markPage) continue;
-    const marks = cricutMarkRectsMm(markPage, page.widthMm, page.heightMm);
+    const marks = cricutMarkRectsMm(markPage, page.widthMm, page.heightMm, cricutMarkOffsetMm(markPage, layout, config));
     for (const placed of layout.placements) {
       const contentRects = isGutterfold(config)
         ? [placed.frontRectMm ?? placed.cutRectMm, backFaceRect(placed, config)]

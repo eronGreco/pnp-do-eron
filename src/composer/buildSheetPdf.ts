@@ -12,7 +12,7 @@ import {
   type PDFPage,
 } from "pdf-lib";
 import type { Card, CutSettings, Rect, Sheet } from "@/cameo/types";
-import { templatePageForSheet, type CricutMarksTemplate } from "@/cricut/markTemplate";
+import { cricutDesignSizeMismatch, cricutMarkOffsetMm, templatePageForSheet, type CricutMarksTemplate } from "@/cricut/markTemplate";
 import {
   artInSensorSafeZone,
   cutRectHitsRegistrationArea,
@@ -39,6 +39,7 @@ import {
 import { pageSizeMm } from "./paperSizes";
 import { backImageFor } from "./pairFrontBack";
 import type { ComposerCard, ComposerConfig, ComposerImage } from "./types";
+import { cameoMarkArmMm } from "./types";
 
 export type ComposedDocument = {
   bytes: ArrayBuffer;
@@ -90,6 +91,7 @@ export async function buildSheetPdf(
   const doc = await PDFDocument.create();
   const sheetSize = pageSizeMm(config);
   const pageW = sheetSize.widthMm;
+  const markArm = cameoMarkArmMm(config);
   const pageH = sheetSize.heightMm;
   const box = (r: Rect) => boxOn(r, pageH);
   const beginClip = (page: PDFPage, r: Rect) => beginClipOn(page, r, pageH);
@@ -170,8 +172,9 @@ export async function buildSheetPdf(
             : placement.clipRectMm,
           pageW,
           pageH,
+          markArm,
         ) ||
-          (backClip ? artInSensorSafeZone(backClip, pageW, pageH) : false));
+          (backClip ? artInSensorSafeZone(backClip, pageW, pageH, markArm) : false));
       const hitsMark =
         cameoMode &&
         cutRectHitsRegistrationArea(
@@ -179,6 +182,7 @@ export async function buildSheetPdf(
           pageW,
           pageH,
           config.registrationWhiteBorderMm,
+          markArm,
         );
 
       if (inSafeZone) {
@@ -242,11 +246,12 @@ export async function buildSheetPdf(
         pageW,
         pageH,
         config.registrationWhiteBorderMm,
+        markArm,
       )) {
         front.drawRectangle({ ...box(backdrop), color: rgb(1, 1, 1) });
       }
 
-      for (const shape of registrationShapesMm(pageW, pageH)) {
+      for (const shape of registrationShapesMm(pageW, pageH, markArm)) {
         front.drawRectangle({ ...box(shape), color: rgb(0, 0, 0) });
       }
     }
@@ -261,9 +266,16 @@ export async function buildSheetPdf(
           markImage = await doc.embedPng(markPage.bytes.slice(0));
           embeddedCricutMarks.set(markPage.sheetNumber, markImage);
         }
+        const offset = cricutMarkOffsetMm(markPage, layout, config);
+        if (cricutDesignSizeMismatch(markPage, layout, config)) {
+          warnings.push(`Folha ${layout.number}: o desenho no PDF da Cricut tem outro tamanho. Confira se o SVG foi redimensionado no Design Space.`);
+        }
+        if (!markPage.designRectMm) {
+          warnings.push(`Folha ${layout.number}: não achei a área do desenho no PDF da Cricut. Confira a primeira impressão.`);
+        }
         front.drawImage(markImage, {
-          x: 0,
-          y: 0,
+          x: mmToPt(offset.dx),
+          y: mmToPt(-offset.dy),
           width: mmToPt(pageW),
           height: mmToPt(pageH),
         });
@@ -310,6 +322,7 @@ export async function buildSheetPdf(
         pageHeightMm: pageH,
         cards: sheetCards,
         rotated: false,
+        ...(config.finishMode === "cameo" ? { registrationArmMm: markArm } : {}),
       });
       continue;
     }
@@ -335,10 +348,11 @@ export async function buildSheetPdf(
         pageW,
         pageH,
         config.registrationWhiteBorderMm,
+        markArm,
       )) {
         back.drawRectangle({ ...box(backdrop), color: rgb(1, 1, 1) });
       }
-      for (const shape of registrationShapesMm(pageW, pageH)) {
+      for (const shape of registrationShapesMm(pageW, pageH, markArm)) {
         back.drawRectangle({ ...box(shape), color: rgb(0, 0, 0) });
       }
     }
@@ -361,7 +375,7 @@ export async function buildSheetPdf(
       cards: sheetCards,
       rotated: false,
       ...(config.finishMode === "cameo"
-        ? { registrationSide: config.cameoRegistrationSide }
+        ? { registrationSide: config.cameoRegistrationSide, registrationArmMm: markArm }
         : {}),
     });
   }

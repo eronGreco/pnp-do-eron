@@ -229,6 +229,7 @@ class Handler(BaseHTTPRequestHandler):
                             "pass": p,
                             "totalPasses": tp,
                         }),
+                        mark_arm_mm=job["mark_arm_mm"],
                     )
                 finally:
                     _job_lock.release()

@@ -31,6 +31,8 @@ export type Sheet = {
   rotated: boolean;
   /** Lado que contém as marcas do sensor e deve ficar para cima no corte. */
   registrationSide?: "front" | "back";
+  /** Braco do L das marcas em mm. Ausente = 10 mm validado. */
+  registrationArmMm?: number;
 };
 
 export type CutSettings = {
@@ -48,6 +50,8 @@ export type CutJob = {
   /** Tamanho da folha em mm. Sem isso, o programa local assume A4 deitada. */
   sheetWidthMm?: number;
   sheetHeightMm?: number;
+  /** Braco do L das marcas impressas. Ausente = 10 mm validado (TB51,200). */
+  markArmMm?: number;
   cards: Rect[];
   settings: CutSettings;
 };

@@ -216,14 +216,14 @@ describe("F/G: marcas de registro", () => {
   it("o fundo branco acompanha os dois bracos de cada marca em L", () => {
     const backdrops = registrationWhiteBackdropsMm(A4_W, A4_H, 2);
     expect(backdrops).toHaveLength(5);
-    // Quadrado: fundo cobre a zona pontilhada do sensor (inset + braco + borda).
-    expect(backdrops[0]).toEqual(rect(8, 8, 22, 22));
+    // Quadrado 5x5: a borda acompanha somente o próprio quadrado.
+    expect(backdrops[0]).toEqual(rect(8, 8, 17, 17));
     expect(backdrops[1]).toEqual(rect(275, 8, 289, 13));
     expect(backdrops[2]).toEqual(rect(284, 8, 289, 22));
   });
 
   it("a linha de corte respeita tambem o fundo branco configurado", () => {
-    const nearSquare = rect(22, 10, 74, 62);
+    const nearSquare = rect(20, 10, 72, 62);
     expect(cutRectHitsRegistrationMark(nearSquare, A4_W, A4_H)).toBe(false);
     expect(cutRectHitsRegistrationArea(nearSquare, A4_W, A4_H, 6)).toBe(true);
   });

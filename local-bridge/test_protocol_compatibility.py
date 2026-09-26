@@ -45,6 +45,13 @@ class ProtocolCompatibilityTests(unittest.TestCase):
         self.assertNotEqual(with_overcut, without_overcut)
         self.assertEqual(len([c for c in with_overcut.split(b"\x03") if c]), 8)
 
+    def test_mark_arm_default_keeps_frozen_block2(self):
+        from cameo_protocol import BLOCK2, build_block2
+        self.assertIs(build_block2(10.0), BLOCK2)
+        custom = build_block2(15.0)
+        self.assertIn(b"TB51,300\x03", custom)
+        self.assertEqual(custom.replace(b"TB51,300", b"TB51,200"), BLOCK2)
+
 
 if __name__ == "__main__":
     unittest.main()

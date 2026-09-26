@@ -1,7 +1,14 @@
 import { A4_LANDSCAPE_H_MM, A4_LANDSCAPE_W_MM } from "@/cut/geometry";
 
 /** Tamanhos de folha suportados na montagem. */
-export type PaperSize = "a4" | "a3" | "custom";
+export type PaperSize =
+  | "a4"
+  | "a3"
+  | "a5"
+  | "carta"
+  | "oficio"
+  | "polaseal"
+  | "custom";
 
 /** Orientacao da folha. Retrato vale apenas no acabamento guilhotina. */
 export type PaperOrientation = "paisagem" | "retrato";
@@ -18,14 +25,25 @@ export const DEFAULT_CUSTOM_HEIGHT_MM = 210;
 
 export type PageSizeMm = { widthMm: number; heightMm: number };
 
-export const PAPER_SIZES: Record<"a4" | "a3", PageSizeMm> = {
+export const PAPER_SIZES: Record<Exclude<PaperSize, "custom">, PageSizeMm> = {
   a4: { widthMm: A4_LANDSCAPE_W_MM, heightMm: A4_LANDSCAPE_H_MM },
   a3: { widthMm: A3_LANDSCAPE_W_MM, heightMm: A3_LANDSCAPE_H_MM },
+  a5: { widthMm: 210, heightMm: 148 },
+  carta: { widthMm: 279, heightMm: 216 },
+  oficio: { widthMm: 356, heightMm: 216 },
+  // Bolsa de plastificacao A4 padrao do mercado brasileiro (Polaseal e
+  // equivalentes, 220 x 307 mm), muito usada em PnP para plastificar as
+  // folhas antes do corte.
+  polaseal: { widthMm: 220, heightMm: 307 },
 };
 
 export const PAPER_LABELS: Record<PaperSize, string> = {
   a4: "A4 (297 × 210 mm)",
   a3: "A3 (420 × 297 mm)",
+  a5: "A5 (210 × 148 mm)",
+  carta: "Carta (279 × 216 mm)",
+  oficio: "Ofício (356 × 216 mm)",
+  polaseal: "Polaseal A4 (220 × 307 mm)",
   custom: "Personalizada (você escolhe)",
 };
 
@@ -50,8 +68,10 @@ type PaperConfig = {
 };
 
 /**
- * A folha A3 vale apenas para guilhotina: a Cameo 4 corta materiais de ate
- * cerca de 30,5 cm de largura.
+ * A3 e Oficio valem apenas na guilhotina e na Cricut: a Cameo 4 corta
+ * materiais de ate cerca de 30,5 cm de largura. A5, Carta e Polaseal A4
+ * (220 x 307 mm) cabem na Cameo, mas seguem o aviso experimental da folha
+ * personalizada.
  *
  * A folha personalizada vale sempre na guilhotina e, na Cameo, somente depois
  * de o usuario aceitar o aviso: as marcas do sensor e a leitura foram
@@ -64,7 +84,10 @@ export function paperAllowed(
 ): boolean {
   if (paper === "a4") return true;
   if (finishMode === "manual" || finishMode === "cricut") return true;
-  return paper === "custom" && cameoCustomSheetAck;
+  // Na Cameo, folhas que cabem na largura util da maquina valem com o aviso
+  // aceito; A3 e Oficio sao largas demais e seguem bloqueadas.
+  if (paper === "a3" || paper === "oficio") return false;
+  return cameoCustomSheetAck;
 }
 
 /**
@@ -92,6 +115,10 @@ export function pageSizeMm(config: PaperConfig): PageSizeMm {
           heightMm: clampCustomMm(config.customHeightMm ?? DEFAULT_CUSTOM_HEIGHT_MM),
         }
       : PAPER_SIZES[effective];
+
+  // Na folha personalizada, largura e altura valem exatamente como digitadas:
+  // a orientacao nao troca os valores de lugar.
+  if (effective === "custom") return base;
 
   const orientation = config.orientation ?? "paisagem";
   if (

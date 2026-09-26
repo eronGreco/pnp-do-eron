@@ -18,6 +18,7 @@ import {
 } from "./layoutSheets";
 import { pageSizeMm } from "./paperSizes";
 import type { ComposerConfig } from "./types";
+import { cameoMarkArmMm } from "./types";
 
 /** Diferenca aceita entre o tamanho pedido e o tamanho real do corte. */
 export const SIZE_TOLERANCE_MM = 0.05;
@@ -132,6 +133,7 @@ export function auditCutSizes(
           page.widthMm,
           page.heightMm,
           config.registrationWhiteBorderMm,
+          cameoMarkArmMm(config),
         )
       ) {
         issues.push({

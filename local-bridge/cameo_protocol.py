@@ -42,6 +42,17 @@ BLOCK2 = (
     b"TB99\x03"
 )
 
+REG_ARM_DEFAULT_MM = 10.0
+
+
+def build_block2(mark_arm_mm=REG_ARM_DEFAULT_MM):
+    """BLOCK2 com o TB51 do braco do L. Com 10 mm e byte a byte o BLOCK2 congelado."""
+    tb51 = int(round(float(mark_arm_mm) * 20.0))
+    if tb51 == 200:
+        return BLOCK2
+    return BLOCK2.replace(b"TB51,200\x03", b"TB51,%d\x03" % tb51)
+
+
 REG_X_MM = 10.0
 REG_Y_MM = 10.0
 REG_WIDTH_MM = 277.0
@@ -231,7 +242,10 @@ class CameoSession:
 
         raise CameoError("Timeout aguardando a Cameo voltar a READY.")
 
-    def registration(self):
+    def registration(self, mark_arm_mm=REG_ARM_DEFAULT_MM):
+        block2 = build_block2(mark_arm_mm)
+        if block2 != BLOCK2:
+            self.log(f"ATENÇÃO: braço das marcas experimental de {mark_arm_mm:g} mm (não validado).")
         self.log("Lendo as registration marks.")
 
         self.reader.wait_armed()
@@ -239,7 +253,7 @@ class CameoSession:
 
         time.sleep(0.108)
         self.reader.wait_armed()
-        write_exact(self.k32, self.handle, BLOCK2)
+        write_exact(self.k32, self.handle, block2)
 
         started = time.monotonic()
         next_poll = started + 0.526
@@ -343,7 +357,8 @@ def read_marks_only(log=None):
 
 
 def cut_job(card_rects_mm, depth=4, force=18, speed=2, passes=1, radius_mm=3.0,
-            line_overcut=False, line_overcut_mm=0.1, log=None, on_progress=None):
+            line_overcut=False, line_overcut_mm=0.1, log=None, on_progress=None,
+            mark_arm_mm=REG_ARM_DEFAULT_MM):
     """READY -> registration -> AutoBlade -> cartas -> M0,0 -> READY."""
     log = log or (lambda msg: None)
 
@@ -353,7 +368,7 @@ def cut_job(card_rects_mm, depth=4, force=18, speed=2, passes=1, radius_mm=3.0,
     with CameoSession(log=log) as s:
         s.query_ready_initial()
         log("Cameo pronta.")
-        s.registration()
+        s.registration(mark_arm_mm)
         s.configure_autoblade(depth, force, speed)
 
         total = len(card_rects_mm)

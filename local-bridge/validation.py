@@ -22,7 +22,13 @@ ALLOWED_JOB_KEYS = {
     "sheet", "cards", "settings",
     "depth", "force", "speed", "passes",
     "radiusMm", "lineOvercut", "lineOvercutMm",
+    "markArmMm", "sheetWidthMm", "sheetHeightMm",
 }
+
+# Braco do L das marcas. 10 mm e o unico valor validado fisicamente;
+# 10 a 20 mm e experimental e muda somente o TB51.
+MARK_ARM_DEFAULT_MM = 10.0
+MARK_ARM_RANGE_MM = (10.0, 20.0)
 
 
 def _int_in_range(payload, key):
@@ -90,6 +96,20 @@ def validate_job(payload):
 
         cards.append((x0, y0, x1, y1))
 
+    mark_arm = payload.get("markArmMm", MARK_ARM_DEFAULT_MM)
+    if not isinstance(mark_arm, (int, float)) or isinstance(mark_arm, bool):
+        raise CameoError("Parâmetro inválido: tamanho da marca.")
+    if not MARK_ARM_RANGE_MM[0] <= float(mark_arm) <= MARK_ARM_RANGE_MM[1]:
+        raise CameoError("Parâmetro fora da faixa permitida: tamanho da marca.")
+
+    # O registration congelado so conhece A4 deitada.
+    sw = payload.get("sheetWidthMm", A4_W_MM)
+    sh = payload.get("sheetHeightMm", A4_H_MM)
+    if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (sw, sh)):
+        raise CameoError("Tamanho de folha inválido.")
+    if abs(float(sw) - A4_W_MM) > 0.5 or abs(float(sh) - A4_H_MM) > 0.5:
+        raise CameoError("O programa local só corta folha A4 deitada (297 x 210 mm).")
+
     sheet = payload.get("sheet", 1)
     if not isinstance(sheet, int) or isinstance(sheet, bool) or sheet < 1:
         raise CameoError("Número de folha inválido.")
@@ -104,4 +124,5 @@ def validate_job(payload):
         "radius_mm": float(radius),
         "line_overcut": line_overcut,
         "line_overcut_mm": float(line_overcut_mm),
+        "mark_arm_mm": float(mark_arm),
     }
