@@ -641,6 +641,8 @@ export const HELP_TOPICS = {
       "Confira se o SVG ficou no tamanho real em milímetros.",
       "Use Print Then Cut e escolha salvar em PDF em vez de imprimir direto.",
       "Importe esse PDF de volta no PNP do Eron para usar as mesmas marcas nas cartas.",
+      "Não precisa apagar o contorno de corte do PDF: o sistema usa esse desenho para alinhar as marcas às cartas.",
+      "O Design Space põe o desenho no canto, e aqui as cartas ficam no centro. O sistema move as marcas junto, mantendo a mesma distância entre marca e corte.",
     ],
     avoid:
       "Não edite a posição, o tamanho nem a rotação do SVG depois de gerar o PDF de marcas. Se mexer, gere o pacote novamente.",

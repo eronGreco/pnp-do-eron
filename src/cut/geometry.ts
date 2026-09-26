@@ -7,6 +7,15 @@ import { su } from "./silhouetteUnits";
 export const REG_INSET_MM = 10;
 export const REG_SQUARE_MM = 5;
 export const REG_ARM_MM = 10;
+/** Faixa aceita para o braco do L em modo experimental (nao validado). */
+export const REG_ARM_MIN_MM = 10;
+export const REG_ARM_MAX_MM = 20;
+
+/** Braco do L efetivo: padrao validado de 10 mm, ou valor experimental limitado. */
+export function clampRegArmMm(value: number | undefined | null): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return REG_ARM_MM;
+  return Math.min(REG_ARM_MAX_MM, Math.max(REG_ARM_MIN_MM, Math.round(value * 2) / 2));
+}
 export const REG_THICKNESS_MM = 1;
 export const REG_SPACING_X_MM = 277;
 export const REG_SPACING_Y_MM = 190;
@@ -35,10 +44,14 @@ export function rectsIntersect(a: Rect, b: Rect, eps = 1e-6): boolean {
  * Quadrado 5x5 no topo esquerdo, L de 10 mm no topo direito e no rodape esquerdo,
  * espessura 1 mm, inset 10 mm.
  */
-export function registrationShapesMm(pageWidthMm: number, pageHeightMm: number): Rect[] {
+export function registrationShapesMm(
+  pageWidthMm: number,
+  pageHeightMm: number,
+  armMm: number = REG_ARM_MM,
+): Rect[] {
   const i = REG_INSET_MM;
   const t = REG_THICKNESS_MM;
-  const arm = REG_ARM_MM;
+  const arm = clampRegArmMm(armMm);
 
   const trX = pageWidthMm - i;
   const blY = pageHeightMm - i;
@@ -60,7 +73,9 @@ export function registrationWhiteBackdropsMm(
   pageWidthMm: number,
   pageHeightMm: number,
   borderMm: number,
+  armMm: number = REG_ARM_MM,
 ): Rect[] {
+  const arm = clampRegArmMm(armMm);
   const border = Math.max(0, borderMm);
   const expanded = (shape: Rect): Rect =>
     rect(
@@ -70,30 +85,24 @@ export function registrationWhiteBackdropsMm(
       Math.min(pageHeightMm, shape.y1 + border),
     );
 
-  const shapes = registrationShapesMm(pageWidthMm, pageHeightMm);
+  const shapes = registrationShapesMm(pageWidthMm, pageHeightMm, arm);
 
-  // O quadrado ganha um fundo quadrado que cobre a mesma area pontilhada
-  // da zona do sensor (inset + braco + borda), centrada na marca.
-  const i = REG_INSET_MM;
-  const squareBackdrop = rect(
-    Math.max(0, i - border),
-    Math.max(0, i - border),
-    Math.min(pageWidthMm, i + REG_ARM_MM + border),
-    Math.min(pageHeightMm, i + REG_ARM_MM + border),
-  );
-
-  // Cada braco dos L recebe seu proprio contorno. Assim, as marcas em L
-  // continuam com formato de L, em vez de ganharem um fundo retangular.
-  return [squareBackdrop, ...shapes.slice(1).map(expanded)];
+  // Todas as marcas (quadrado e bracos dos L) recebem exatamente a borda
+  // escolhida em volta do proprio desenho. Com borda 0, nao ha fundo extra.
+  return shapes.map(expanded);
 }
 
 /**
  * Area em que o sensor procura cada marca. Invadir isso e apenas AVISO.
  */
-export function sensorSafeZonesMm(pageWidthMm: number, pageHeightMm: number): Rect[] {
+export function sensorSafeZonesMm(
+  pageWidthMm: number,
+  pageHeightMm: number,
+  armMm: number = REG_ARM_MM,
+): Rect[] {
   const pad = 6;
   const i = REG_INSET_MM;
-  const arm = REG_ARM_MM;
+  const arm = clampRegArmMm(armMm);
 
   return [
     rect(i - pad, i - pad, i + arm + pad, i + arm + pad),
@@ -106,8 +115,9 @@ export function artInSensorSafeZone(
   artRect: Rect,
   pageWidthMm: number,
   pageHeightMm: number,
+  armMm: number = REG_ARM_MM,
 ): boolean {
-  return sensorSafeZonesMm(pageWidthMm, pageHeightMm).some((z) => rectsIntersect(artRect, z));
+  return sensorSafeZonesMm(pageWidthMm, pageHeightMm, armMm).some((z) => rectsIntersect(artRect, z));
 }
 
 /**
@@ -118,8 +128,9 @@ export function cutRectHitsRegistrationMark(
   cutRect: Rect,
   pageWidthMm: number,
   pageHeightMm: number,
+  armMm: number = REG_ARM_MM,
 ): boolean {
-  return registrationShapesMm(pageWidthMm, pageHeightMm).some((m) =>
+  return registrationShapesMm(pageWidthMm, pageHeightMm, armMm).some((m) =>
     rectsIntersect(cutRect, m),
   );
 }
@@ -133,8 +144,9 @@ export function cutRectHitsRegistrationArea(
   pageWidthMm: number,
   pageHeightMm: number,
   whiteBorderMm: number,
+  armMm: number = REG_ARM_MM,
 ): boolean {
-  return registrationWhiteBackdropsMm(pageWidthMm, pageHeightMm, whiteBorderMm).some((area) =>
+  return registrationWhiteBackdropsMm(pageWidthMm, pageHeightMm, whiteBorderMm, armMm).some((area) =>
     rectsIntersect(cutRect, area),
   );
 }
@@ -217,4 +229,12 @@ export function registrationSpacingMm(page: {
 export function registrationTb123(page: { widthMm: number; heightMm: number }): string {
   const spacing = registrationSpacingMm(page);
   return `TB123,${su(spacing.yMm)},${su(spacing.xMm)},118,118`;
+}
+
+/**
+ * Comando TB51 (comprimento do braco da marca, em unidades da maquina).
+ * Com o padrao de 10 mm resulta em "TB51,200", identico ao protocolo congelado.
+ */
+export function registrationTb51(armMm: number = REG_ARM_MM): string {
+  return `TB51,${su(clampRegArmMm(armMm))}`;
 }

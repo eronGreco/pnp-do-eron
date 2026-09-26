@@ -2,12 +2,28 @@ import type { Composer } from "@/composer/useComposer";
 import { Field } from "@/components/panels/Field";
 import { Button } from "@/components/ui/button";
 import { DisabledConfig } from "@/components/panels/DisabledConfig";
+import { gridFor } from "@/composer/layoutSheets";
+import { PACKING_LABEL, packingPatch } from "@/composer/packingPolicy";
+import type { ComposerConfig, PackingPolicy } from "@/composer/types";
+
+/** Procura uma organizacao guiada que aproveite mais espacos sem cair nas marcas. */
+function findBetterPacking(config: ComposerConfig, current: number) {
+  const options: PackingPolicy[] = ["seguro", "economico", "colado"];
+  let best: { policy: PackingPolicy; perSheet: number } | null = null;
+  for (const policy of options) {
+    if (policy === config.packingPolicy) continue;
+    const perSheet = gridFor({ ...config, ...packingPatch(policy, config) }).perSheet;
+    if (perSheet > current && (!best || perSheet > best.perSheet)) best = { policy, perSheet };
+  }
+  return best;
+}
 
 export function GridPanel({ composer }: { composer: Composer }) {
   const { config, grid, layouts, cards } = composer;
   const manualGrid = config.gridMode === "manual";
   const wholeSheet = config.assemblyMode === "gutterfold" && config.gutterfoldLayout === "sheet";
   const unit = config.assemblyMode === "gutterfold" && !wholeSheet ? "peça(s)" : "carta(s)";
+  const betterPacking = grid.blockedSlots > 0 ? findBetterPacking(config, grid.perSheet) : null;
 
   return (
     <div className="space-y-4">
@@ -80,6 +96,42 @@ export function GridPanel({ composer }: { composer: Composer }) {
           <p>
             {grid.blockedSlots} espaço(s) ficaram de fora porque cairiam sobre as marcas do sensor.
           </p>
+        )}
+        {grid.blockedSlots > 0 && (
+          <div className="space-y-2 rounded-md border border-border bg-background/60 p-2 text-foreground">
+            <p className="leading-snug">
+              Outra saída é diminuir a borda branca das marcas: ela afasta as cartas das marcas, então uma borda menor pode liberar espaço.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto w-full whitespace-normal py-2 text-[11px]"
+              onClick={() => {
+                const target = document.getElementById("campo-borda-branca");
+                if (!target) return;
+                target.scrollIntoView({ behavior: "smooth", block: "center" });
+                target.classList.add("ring-2", "ring-primary");
+                window.setTimeout(() => target.classList.remove("ring-2", "ring-primary"), 1600);
+              }}
+            >
+              Ir para a borda branca das marcas
+            </Button>
+          </div>
+        )}
+        {grid.blockedSlots > 0 && betterPacking && (
+          <div className="space-y-2 rounded-md border border-primary/40 bg-primary/5 p-2 text-foreground">
+            <p className="leading-snug">
+              Com a organização "{PACKING_LABEL[betterPacking.policy]}" as cartas ficam mais juntas no centro, se afastam das marcas e cabem {betterPacking.perSheet} por folha.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto w-full whitespace-normal py-2 text-[11px]"
+              onClick={() => composer.setConfig({ ...config, ...packingPatch(betterPacking.policy, config) })}
+            >
+              Usar "{PACKING_LABEL[betterPacking.policy]}" e caber {betterPacking.perSheet}
+            </Button>
+          </div>
         )}
       </div>
     </div>

@@ -1,5 +1,6 @@
 import type { Composer } from "@/composer/useComposer";
 import type { CameoRegistrationSide } from "@/composer/types";
+import { clampRegArmMm } from "@/cut/geometry";
 import {
   MANUAL_MARK_HINTS,
   MANUAL_MARK_LABELS,
@@ -295,15 +296,61 @@ export function MarksPanel({ composer }: { composer: Composer }) {
             </div>
             </DisabledConfig>
           )}
-          <Field
-            label="Borda branca das marcas (mm)"
-            max={10}
-            value={config.registrationWhiteBorderMm}
-            onChange={(value) =>
-              composer.setConfig({ ...config, registrationWhiteBorderMm: value })
-            }
-          />
+          <div id="campo-borda-branca" className="scroll-mt-4 rounded-md transition-shadow">
+            <Field
+              label="Borda branca das marcas (mm)"
+              max={10}
+              value={config.registrationWhiteBorderMm}
+              onChange={(value) =>
+                composer.setConfig({ ...config, registrationWhiteBorderMm: value })
+              }
+            />
+          </div>
           <HelpButton topic="borda-branca-marcas" label="entenda a borda branca" />
+          <div className="space-y-2 rounded-lg border border-border bg-background/40 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="cameo-arm-custom" className="text-xs font-medium">
+                Mudar o tamanho do L das marcas
+              </Label>
+              <Switch
+                id="cameo-arm-custom"
+                checked={config.cameoMarkArmCustom}
+                onCheckedChange={(checked) =>
+                  // Ao ligar, o campo ja abre com um valor valido escrito:
+                  // 10 mm quando nenhum tamanho foi escolhido antes.
+                  composer.setConfig({
+                    ...config,
+                    cameoMarkArmCustom: checked,
+                    cameoMarkArmMm: clampRegArmMm(config.cameoMarkArmMm),
+                  })
+                }
+              />
+            </div>
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              Padrão testado na Cameo 4: braço de 10 mm. O quadrado, a espessura e a distância da borda não mudam.
+            </p>
+            <DisabledConfig
+              disabled={!config.cameoMarkArmCustom}
+              reason="Não é possível editar porque o tamanho testado de 10 mm está em uso. Ligue a opção acima para mudar."
+            >
+              <Field
+                label="Comprimento do braço do L (mm)"
+                min={10}
+                max={20}
+                step={0.5}
+                value={config.cameoMarkArmMm}
+                disabled={!config.cameoMarkArmCustom}
+                onChange={(value) => composer.setConfig({ ...config, cameoMarkArmMm: value })}
+              />
+            </DisabledConfig>
+            {config.cameoMarkArmCustom && (
+              <p className="rounded-md border border-warning/50 bg-warning/10 p-2 text-[11px] leading-snug text-warning">
+                Experimental: só o braço de 10 mm foi testado numa Cameo 4. Com outro tamanho, a Cameo também recebe a
+                nova medida na leitura das marcas. Faça um teste em papel comum antes de cortar o material bom, e
+                imprima de novo as folhas se mudar este valor.
+              </p>
+            )}
+          </div>
         </>
       )}
     </div>

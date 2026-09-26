@@ -87,6 +87,7 @@ export function PreviewCanvas({
               sheet.pageWidthMm,
               sheet.pageHeightMm,
               registrationWhiteBorderMm,
+              sheet.registrationArmMm,
             ).map((backdrop, index) => (
               <rect
                 key={`backdrop-${index}`}
@@ -98,7 +99,7 @@ export function PreviewCanvas({
               />
             ))}
 
-            {showCameoOverlay && displaySide === registrationSide && sensorSafeZonesMm(sheet.pageWidthMm, sheet.pageHeightMm).map((zone, index) => (
+            {showCameoOverlay && displaySide === registrationSide && sensorSafeZonesMm(sheet.pageWidthMm, sheet.pageHeightMm, sheet.registrationArmMm).map((zone, index) => (
               <rect
                 key={`zone-${index}`}
                 x={scale(zone.x0)}
@@ -113,7 +114,7 @@ export function PreviewCanvas({
               />
             ))}
 
-            {showCameoOverlay && displaySide === registrationSide && registrationShapesMm(sheet.pageWidthMm, sheet.pageHeightMm).map((mark, index) => (
+            {showCameoOverlay && displaySide === registrationSide && registrationShapesMm(sheet.pageWidthMm, sheet.pageHeightMm, sheet.registrationArmMm).map((mark, index) => (
               <rect
                 key={`mark-${index}`}
                 x={scale(mark.x0)}

@@ -13,6 +13,7 @@ import {
   isGutterfold,
 } from "@/composer/layoutSheets";
 import { pageSizeMm } from "@/composer/paperSizes";
+import { cameoMarkArmMm } from "@/composer/types";
 import { backImageFor } from "@/composer/pairFrontBack";
 import {
   registrationShapesMm,
@@ -20,7 +21,7 @@ import {
 } from "@/cut/geometry";
 import { sensorSafeZonesMm } from "@/cut/geometry";
 import { manualMarkCss, manualMarkRectsMm, marksOnSide } from "@/cut/manualMarks";
-import { cricutMarkRectsMm, templatePageForSheet } from "@/cricut/markTemplate";
+import { cricutMarkOffsetMm, sheetDesignRectMm, templatePageForSheet } from "@/cricut/markTemplate";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -133,7 +134,10 @@ export function LayoutPreview({
     config.finishMode === "cricut" && side === "front"
       ? templatePageForSheet(composer.cricutMarks, layout.number)
       : null;
-  const cricutMarks = cricutMarkPage ? cricutMarkRectsMm(cricutMarkPage, pageW, pageH) : [];
+  const cricutOffset = cricutMarkPage
+    ? cricutMarkOffsetMm(cricutMarkPage, layout, config)
+    : { dx: 0, dy: 0 };
+  const cricutDesign = cricutMarkPage ? sheetDesignRectMm(layout, config) : null;
   const manualMarks =
     config.finishMode === "manual" && (gutterfold || marksOnSide(config.manualMarks, side))
       ? manualMarkRectsMm(
@@ -851,7 +855,7 @@ export function LayoutPreview({
           ))}
 
           {cameoMode &&
-            sensorSafeZonesMm(page.widthMm, page.heightMm).map((zone, index) => (
+            sensorSafeZonesMm(page.widthMm, page.heightMm, cameoMarkArmMm(config)).map((zone, index) => (
               <rect
                 key={`zone-${index}`}
                 x={zone.x0}
@@ -871,6 +875,7 @@ export function LayoutPreview({
               page.widthMm,
               page.heightMm,
               config.registrationWhiteBorderMm,
+              cameoMarkArmMm(config),
             ).map((backdrop, index) => (
               <rect
                 key={`backdrop-${index}`}
@@ -884,7 +889,7 @@ export function LayoutPreview({
 
           {cameoMode &&
             side === cameoMarksSide &&
-            registrationShapesMm(page.widthMm, page.heightMm).map((mark, index) => (
+            registrationShapesMm(page.widthMm, page.heightMm, cameoMarkArmMm(config)).map((mark, index) => (
               <rect
                 key={`mark-${index}`}
                 x={mark.x0}
@@ -895,17 +900,30 @@ export function LayoutPreview({
               />
             ))}
 
-          {cricutMarks.map((mark, index) => (
-            <rect
-              key={`cricut-${index}`}
-              x={mark.x0}
-              y={mark.y0}
-              width={mark.x1 - mark.x0}
-              height={mark.y1 - mark.y0}
-              fill="black"
+          {cricutMarkPage && (
+            <image
+              href={cricutMarkPage.previewUrl}
+              x={cricutOffset.dx}
+              y={cricutOffset.dy}
+              width={pageW}
+              height={pageH}
+              preserveAspectRatio="none"
               pointerEvents="none"
             />
-          ))}
+          )}
+          {cricutMarkPage && cricutDesign && (
+            <rect
+              x={cricutDesign.x0}
+              y={cricutDesign.y0}
+              width={cricutDesign.x1 - cricutDesign.x0}
+              height={cricutDesign.y1 - cricutDesign.y0}
+              fill="none"
+              stroke="var(--primary)"
+              strokeWidth={0.4}
+              strokeDasharray="2 1.5"
+              pointerEvents="none"
+            />
+          )}
         </svg>
 
         {pendingImages > 0 && (

@@ -65,6 +65,10 @@ export function SheetPanel({
   const packing = effectivePacking(config);
   const ack = config.cameoCustomSheetAck;
   const a3Allowed = paperAllowed("a3", config.finishMode, ack);
+  const a5Allowed = paperAllowed("a5", config.finishMode, ack);
+  const cartaAllowed = paperAllowed("carta", config.finishMode, ack);
+  const polasealAllowed = paperAllowed("polaseal", config.finishMode, ack);
+  const oficioAllowed = paperAllowed("oficio", config.finishMode, ack);
   const customAllowed = paperAllowed("custom", config.finishMode, ack);
   const retratoAllowed = orientationAllowed("retrato", config.finishMode, ack);
   const page = pageSizeMm(config);
@@ -109,6 +113,18 @@ export function SheetPanel({
               <SelectItem value="a3" disabled={!a3Allowed}>
                 {PAPER_LABELS.a3}
               </SelectItem>
+              <SelectItem value="a5" disabled={!a5Allowed}>
+                {PAPER_LABELS.a5}
+              </SelectItem>
+              <SelectItem value="carta" disabled={!cartaAllowed}>
+                {PAPER_LABELS.carta}
+              </SelectItem>
+              <SelectItem value="polaseal" disabled={!polasealAllowed}>
+                {PAPER_LABELS.polaseal}
+              </SelectItem>
+              <SelectItem value="oficio" disabled={!oficioAllowed}>
+                {PAPER_LABELS.oficio}
+              </SelectItem>
               <SelectItem value="custom" disabled={!customAllowed}>
                 {PAPER_LABELS.custom}
               </SelectItem>
@@ -143,6 +159,7 @@ export function SheetPanel({
             </div>
           </DisabledConfig>
 
+          {config.paperSize !== "custom" && (
           <Select
             value={config.orientation}
             onValueChange={(value) =>
@@ -159,6 +176,7 @@ export function SheetPanel({
               </SelectItem>
             </SelectContent>
           </Select>
+          )}
         </div>
         <p className="text-[10px] text-muted-foreground">
           Folha em uso: {page.widthMm} por {page.heightMm} mm. Imprima sempre em escala de 100%.

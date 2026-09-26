@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,22 @@ export function NumberStepper({
   const atMin = value <= min;
   const atMax = typeof max === "number" && value >= max;
 
+  // Texto livre enquanto digita; o valor so e confirmado quando valido ou ao sair do campo.
+  const [draft, setDraft] = useState<string | null>(null);
+  useEffect(() => setDraft(null), [value]);
+  // Campo desligado nao guarda digitacao pendente: ao voltar, mostra o valor real.
+  useEffect(() => {
+    if (disabled) setDraft(null);
+  }, [disabled]);
+
+  const commitDraft = () => {
+    if (draft === null) return;
+    const next = Number(draft);
+    setDraft(null);
+    if (!Number.isFinite(next)) return;
+    onChange(clamp(next));
+  };
+
   return (
     <div className="flex items-stretch gap-1">
       <Button
@@ -56,16 +73,25 @@ export function NumberStepper({
         min={min}
         max={max}
         step={step}
-        value={value}
+        value={draft ?? String(value)}
         disabled={disabled}
         aria-label={ariaLabel}
         className="h-9 min-w-0 flex-1 px-2 text-center tabular-nums"
         onChange={(event) => {
-          const next = Number(event.target.value);
+          const text = event.target.value;
+          setDraft(text);
+          const next = Number(text);
           if (!Number.isFinite(next)) return;
           if (next < min) return;
           if (typeof max === "number" && next > max) return;
           onChange(next);
+        }}
+        onBlur={commitDraft}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commitDraft();
+          }
         }}
       />
       <Button

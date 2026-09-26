@@ -31,6 +31,8 @@ type MSheet = {
   a?: "g";
   r?: 1;
   q?: "b";
+  /** Braco do L experimental, em mm. */
+  m?: number;
   c: MCard[];
 };
 
@@ -94,6 +96,7 @@ export function encodeJobManifest(sheets: Sheet[], settings?: CutSettings): stri
       if (sheet.assemblyMode === "gutterfold") out.a = "g";
       if (sheet.rotated) out.r = 1;
       if (sheet.registrationSide === "back") out.q = "b";
+      if (sheet.registrationArmMm && sheet.registrationArmMm !== 10) out.m = r2(sheet.registrationArmMm);
       return out;
     }),
   };
@@ -118,6 +121,7 @@ export function decodeJobManifestString(value: string | null | undefined): JobMa
       pageHeightMm: sheet.h,
       rotated: sheet.r === 1,
       registrationSide: sheet.q === "b" ? "back" : "front",
+      ...(typeof sheet.m === "number" ? { registrationArmMm: sheet.m } : {}),
       cards: sheet.c.map<Card>((card) => {
         const out: Card = {
           id: `s${sheet.n}-c${card.n}`,

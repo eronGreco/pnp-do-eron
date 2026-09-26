@@ -2,6 +2,38 @@
 
 As mudanças relevantes do PNP do Eron são registradas neste arquivo.
 
+## 2026-09-26 - atualização 2
+
+### Cricut: leitura e alinhamento das marcas
+
+- Refeito o reconhecimento das marcas no PDF gerado pelo Cricut Design Space, com validação dos cantos e filtragem mais robusta dos elementos gráficos da página.
+- O sistema passa a detectar a área ocupada pelo desenho no PDF e usa essa referência para deslocar as marcas até a posição real das cartas na montagem.
+- A prévia mostra a área de desenho reconhecida e avisa quando ela não pôde ser detectada ou quando o tamanho do desenho não corresponde à montagem atual.
+- Adicionados testes automatizados específicos para o alinhamento entre o desenho detectado no PDF e a geometria das cartas.
+
+### Silhouette Cameo: marcas de registro
+
+- Adicionada opção experimental para alterar o comprimento dos braços em L das marcas de registro entre 10 e 20 mm, em passos de 0,5 mm.
+- O padrão continua em 10 mm, único tamanho fisicamente validado na Cameo 4.
+- O tamanho escolhido passa pelo PDF, manifesto do trabalho, transporte local e PNP Cameo Bridge até o comando de registration da máquina.
+- No protocolo da Cameo, somente o `TB51` varia quando o modo experimental é usado; os demais comandos, tempos e validações permanecem inalterados.
+- Corrigida a área branca de proteção das marcas para acompanhar individualmente o quadrado e os braços em L, sem criar margem excessiva ao redor do quadrado.
+
+### Folhas e dimensões
+
+- Adicionados presets de folha A5, Carta, Ofício e Polaseal A4 (220 × 307 mm), além de A4, A3 e tamanho personalizado.
+- Folhas personalizadas agora respeitam exatamente a largura e a altura digitadas, sem trocar automaticamente os valores pela orientação.
+- A5, Carta e Polaseal podem ser selecionados no fluxo Cameo mediante confirmação experimental; A3 e Ofício continuam bloqueados nesse modo por excederem a largura útil considerada.
+- O PNP Cameo Bridge continua validado para corte direto em A4 paisagem.
+
+### Grade, margens e interface
+
+- Quando as marcas do sensor bloqueiam posições da grade, o sistema passa a sugerir alternativas de organização que possam aproveitar melhor a folha.
+- Adicionado atalho direto do aviso de grade para o ajuste da borda branca das marcas.
+- Campos numéricos agora permitem digitação livre durante a edição e normalizam o valor ao confirmar ou sair do campo.
+- Prévia, auditoria de tamanho, áreas seguras e mensagens de ajuda foram atualizadas para considerar o tamanho configurado das marcas e os novos formatos de folha.
+
+
 ## 2026-09-26
 
 ### Montagem e gutterfold

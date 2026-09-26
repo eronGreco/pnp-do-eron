@@ -10,6 +10,7 @@ import {
 } from "./layoutSheets";
 import { pageSizeMm } from "./paperSizes";
 import type { ComposerCard, ComposerConfig } from "./types";
+import { cameoMarkArmMm } from "./types";
 
 /**
  * A faixa branca ao redor de cada marca do sensor e obrigatoria: sem ela a
@@ -45,6 +46,7 @@ function backdrops(config: ComposerConfig): Rect[] {
     page.widthMm,
     page.heightMm,
     config.registrationWhiteBorderMm,
+    cameoMarkArmMm(config),
   );
 }
 

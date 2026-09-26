@@ -134,6 +134,7 @@ export class LocalBridgeTransport implements CameoTransport {
       ...(job.sheetWidthMm && job.sheetHeightMm
         ? { sheetWidthMm: job.sheetWidthMm, sheetHeightMm: job.sheetHeightMm }
         : {}),
+      ...(job.markArmMm && job.markArmMm !== 10 ? { markArmMm: job.markArmMm } : {}),
       cards: job.cards.map((rect) => ({
         x0Mm: rect.x0,
         y0Mm: rect.y0,

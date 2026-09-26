@@ -102,13 +102,15 @@ O projeto inclui presets usados no mercado de jogos de tabuleiro e também aceit
 
 ### Folhas
 
-- **A4**.
-- **A3** para fluxos compatíveis.
+- **A4**, **A3** e **A5**.
+- **Carta (279 × 216 mm)** e **Ofício (356 × 216 mm)**.
+- **Polaseal A4 (220 × 307 mm)** para projetos plastificados antes do corte.
 - Folha **personalizada**, entre 50 e 1000 mm por lado.
 - Orientação paisagem ou retrato quando compatível com o acabamento escolhido.
+- Em folhas personalizadas, largura e altura são respeitadas exatamente como digitadas.
 
 > [!NOTE]
-> Na Silhouette Cameo, o formato fisicamente validado é **A4 paisagem**. Folhas personalizadas e retrato exigem confirmação explícita no sistema. A3 não é usada no modo Cameo.
+> Na Silhouette Cameo, o corte direto pelo PNP Cameo Bridge permanece fisicamente validado em **A4 paisagem**. Outros formatos que cabem na largura da máquina podem aparecer como experimentais na montagem; A3 e Ofício permanecem bloqueados no modo Cameo.
 
 ### Organização inteligente
 
@@ -154,6 +156,9 @@ O modo gutterfold foi feito para projetos em que frente e verso são unidos dobr
 | **Impressão** | PDF final montado localmente, com frente e verso alinhados |
 
 No fluxo Cricut, apenas o **SVG de corte** precisa ir para o Design Space. As imagens das cartas permanecem no PNP do Eron.
+
+- O PDF devolvido pelo Design Space é analisado para localizar as marcas e a área ocupada pelo desenho, mantendo o alinhamento com a posição real das cartas.
+- Na Cameo, o braço em L das marcas usa **10 mm por padrão**. Há um ajuste experimental entre 10 e 20 mm que altera somente o comprimento do braço e o comando correspondente de registration.
 
 ### Auditoria antes do download
 

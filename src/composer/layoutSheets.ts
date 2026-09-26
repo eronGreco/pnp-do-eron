@@ -9,6 +9,7 @@ import { manualMarkMarginMm } from "@/cut/manualMarks";
 import { pageSizeMm } from "./paperSizes";
 import { effectivePacking } from "./packingPolicy";
 import type { ComposerCard, ComposerConfig } from "./types";
+import { cameoMarkArmMm } from "./types";
 
 export type PlacedCard = {
   card: ComposerCard;
@@ -157,7 +158,7 @@ const MARK_CLEARANCE_MM = 1;
 function blockedAreas(config: ComposerConfig): Rect[] {
   if (config.finishMode !== "cameo") return [];
   const page = pageSizeMm(config);
-  return registrationShapesMm(page.widthMm, page.heightMm).map((mark) =>
+  return registrationShapesMm(page.widthMm, page.heightMm, cameoMarkArmMm(config)).map((mark) =>
     rect(
       Math.max(0, mark.x0 - MARK_CLEARANCE_MM),
       Math.max(0, mark.y0 - MARK_CLEARANCE_MM),

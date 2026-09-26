@@ -26,6 +26,7 @@ Somente números:
 ```json
 {
   "sheet": 1,
+  "markArmMm": 10,
   "cards": [{ "x0Mm": 20.0, "y0Mm": 20.0, "x1Mm": 72.0, "y1Mm": 72.0 }],
   "settings": {
     "depth": 4, "force": 18, "speed": 2, "passes": 1,
@@ -86,8 +87,7 @@ comportamento validado fisicamente no PNP-Cameo-GUI v1.7v:
   (10, 10) mm; comandos `M`/`D` na ordem Y,X.
 - Fim do trabalho: `M0,0` e READY.
 
-Não alterar `TB51,200`, `TB53,20`, `TB123,3800,5540,118,118`, os tempos ou as marcas
-de 10 mm sem uma nova captura USBPcap que comprove a mudança.
+O protocolo fisicamente validado continua usando `TB51,200`, equivalente a braços de **10 mm**. O modo experimental aceita braços entre 10 e 20 mm e altera somente o valor de `TB51` na proporção de 20 unidades por milímetro. `TB53,20`, `TB123,3800,5540,118,118`, os tempos, a sequência de registration e os critérios de sucesso permanecem congelados.
 
 ## Arquivos
 

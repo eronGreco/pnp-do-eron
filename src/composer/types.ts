@@ -1,3 +1,4 @@
+import { clampRegArmMm, REG_ARM_MM } from "@/cut/geometry";
 import {
   DEFAULT_MANUAL_MARKS,
   type FinishMode,
@@ -84,6 +85,10 @@ export type ComposerConfig = {
   registrationWhiteBorderMm: number;
   /** Lado impresso que será carregado virado para cima na Silhouette. */
   cameoRegistrationSide: CameoRegistrationSide;
+  /** Liga o tamanho experimental do braco do L das marcas da Cameo. */
+  cameoMarkArmCustom: boolean;
+  /** Braco do L em mm quando experimental. O padrao validado e 10 mm. */
+  cameoMarkArmMm: number;
   /** Forma de montar cada carta na folha. */
   assemblyMode: AssemblyMode;
   /** Peças separadas ou a folha inteira dobrada ao meio. */
@@ -121,6 +126,11 @@ export type ComposerConfig = {
 
 export const BACK_OFFSET_LIMIT_MM = 10;
 
+/** Braco do L efetivo das marcas da Cameo: 10 mm validado, salvo modo experimental. */
+export function cameoMarkArmMm(config: Pick<ComposerConfig, "cameoMarkArmCustom" | "cameoMarkArmMm">): number {
+  return config.cameoMarkArmCustom ? clampRegArmMm(config.cameoMarkArmMm) : REG_ARM_MM;
+}
+
 export const DEFAULT_COMPOSER_CONFIG: ComposerConfig = {
   paperSize: "a4",
   orientation: "paisagem",
@@ -138,6 +148,8 @@ export const DEFAULT_COMPOSER_CONFIG: ComposerConfig = {
   gridRows: 2,
   registrationWhiteBorderMm: 6,
   cameoRegistrationSide: "front",
+  cameoMarkArmCustom: false,
+  cameoMarkArmMm: 10,
   assemblyMode: "normal",
   gutterfoldLayout: "piece",
   gutterfoldDirection: "auto",

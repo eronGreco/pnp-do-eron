@@ -76,7 +76,7 @@ function Studio() {
   const update = useAppUpdate();
 
   // Mudou acabamento ou marcas: a prévia da montagem aparece na hora.
-  const marksKey = `${composer.config.finishMode}|${composer.config.assemblyMode}|${composer.config.gutterfoldLayout}|${composer.config.gutterfoldDirection}|${composer.config.gutterfoldGapMm}|${composer.config.cameoRegistrationSide}|${JSON.stringify(composer.config.manualMarks)}`;
+  const marksKey = `${composer.config.finishMode}|${composer.config.assemblyMode}|${composer.config.gutterfoldLayout}|${composer.config.gutterfoldDirection}|${composer.config.gutterfoldGapMm}|${composer.config.cameoRegistrationSide}|${composer.config.cameoMarkArmCustom}|${composer.config.cameoMarkArmMm}|${JSON.stringify(composer.config.manualMarks)}`;
   const firstMarksKey = useRef(marksKey);
   useEffect(() => {
     if (marksKey === firstMarksKey.current) return;
@@ -100,6 +100,7 @@ function Studio() {
             sheet?.pageWidthMm ?? 297,
             sheet?.pageHeightMm ?? 210,
             workspace.registrationWhiteBorderMm,
+            sheet?.registrationArmMm,
           )
         : card.hitsRegistrationMark,
     );
@@ -134,6 +135,7 @@ function Studio() {
     void cameo.cut({
       sheet: sheet.number,
       ...(page ? { sheetWidthMm: page.widthMm, sheetHeightMm: page.heightMm } : {}),
+      ...(sheet.registrationArmMm ? { markArmMm: sheet.registrationArmMm } : {}),
       cards: selectedCards.map((card) => card.cutRectMm),
       settings,
     });
