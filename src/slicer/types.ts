@@ -20,6 +20,10 @@ export type SliceConfig = {
   /** Percentuais relativos ao menor lado de cada carta. */
   cornerFillCornerPercent: number;
   cornerFillEdgePercent: number;
+  /** Formato dos arquivos de cartas dentro do ZIP. */
+  outputFormat: "png" | "jpeg";
+  /** 300 preserva os pixels do recorte; outros valores redimensionam proporcionalmente. */
+  outputDpi: 150 | 300 | 600;
 };
 
 export const DEFAULT_SLICE_CONFIG: SliceConfig = {
@@ -37,6 +41,8 @@ export const DEFAULT_SLICE_CONFIG: SliceConfig = {
   cornerFill: false,
   cornerFillCornerPercent: 8,
   cornerFillEdgePercent: 1,
+  outputFormat: "png",
+  outputDpi: 300,
 };
 
 export const MAX_GRID = 20;

@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ArrowDownUp, ArrowLeftRight, Sparkles } from "lucide-react";
 
 import type { Composer } from "@/composer/useComposer";
 import {
@@ -18,6 +18,7 @@ import {
 import { MIN_SAFE_WHITE_BORDER_MM } from "@/composer/markCoverage";
 import { Field } from "@/components/panels/Field";
 import { GridPanel } from "@/components/panels/GridPanel";
+import { DisabledConfig } from "@/components/panels/DisabledConfig";
 import { MarksPanel } from "@/components/panels/MarksPanel";
 import { CricutMarksPanel } from "@/components/panels/CricutMarksPanel";
 import {
@@ -33,6 +34,9 @@ import { Label } from "@/components/ui/label";
 import { HelpButton } from "@/components/HelpButton";
 import type { HelpTopicId } from "@/help/helpTopics";
 import type { Workspace } from "@/state/useWorkspace";
+import { AdvancedSection } from "@/components/panels/AdvancedSection";
+import { effectivePacking, packingPatch, PACKING_LABEL } from "@/composer/packingPolicy";
+import type { BleedMode } from "@/composer/types";
 
 function SectionLabel({ children, help }: { children: React.ReactNode; help?: HelpTopicId }) {
   return (
@@ -57,6 +61,8 @@ export function SheetPanel({
   const isCameo = config.finishMode === "cameo";
   const isCricut = config.finishMode === "cricut";
   const gutterfold = config.assemblyMode === "gutterfold";
+  const wholeSheet = gutterfold && config.gutterfoldLayout === "sheet";
+  const packing = effectivePacking(config);
   const ack = config.cameoCustomSheetAck;
   const a3Allowed = paperAllowed("a3", config.finishMode, ack);
   const customAllowed = paperAllowed("custom", config.finishMode, ack);
@@ -109,13 +115,17 @@ export function SheetPanel({
             </SelectContent>
           </Select>
 
-          {config.paperSize === "custom" && (
+          <DisabledConfig
+            disabled={config.paperSize !== "custom"}
+            reason="Não é possível editar largura e altura porque a folha Personalizada não está selecionada."
+          >
             <div className="grid grid-cols-2 gap-3">
               <Field
                 label="Largura (mm)"
                 min={CUSTOM_MIN_MM}
                 max={CUSTOM_MAX_MM}
                 value={config.customWidthMm ?? DEFAULT_CUSTOM_WIDTH_MM}
+                disabled={config.paperSize !== "custom"}
                 onChange={(value) =>
                   composer.setConfig({ ...config, customWidthMm: clampCustomMm(value) })
                 }
@@ -125,12 +135,13 @@ export function SheetPanel({
                 min={CUSTOM_MIN_MM}
                 max={CUSTOM_MAX_MM}
                 value={config.customHeightMm ?? DEFAULT_CUSTOM_HEIGHT_MM}
+                disabled={config.paperSize !== "custom"}
                 onChange={(value) =>
                   composer.setConfig({ ...config, customHeightMm: clampCustomMm(value) })
                 }
               />
             </div>
-          )}
+          </DisabledConfig>
 
           <Select
             value={config.orientation}
@@ -152,43 +163,137 @@ export function SheetPanel({
         <p className="text-[10px] text-muted-foreground">
           Folha em uso: {page.widthMm} por {page.heightMm} mm. Imprima sempre em escala de 100%.
         </p>
+        {isCameo && !ack && (
+          <p className="rounded-md border border-border bg-muted/40 px-2.5 py-2 text-[10px] leading-relaxed text-muted-foreground" role="note">
+            A3, Personalizada e Retrato estão desativados porque “Liberar folha diferente de A4 deitada” está desligado.
+          </p>
+        )}
         {config.paperSize === "custom" && <HelpButton topic="folha-personalizada" />}
       </section>
 
       <section className="space-y-2 border-t border-border pt-5">
         <SectionLabel help="espaco-cartas">
-          {gutterfold ? "Espaço entre as peças" : "Espaço entre as cartas"}
+          Espaçamentos
         </SectionLabel>
-        <div className="grid grid-cols-2 gap-3">
-          <Field
-            label="Espaço (mm)"
-            value={config.gapMm}
-            onChange={(value) => composer.setConfig({ ...config, gapMm: value })}
-          />
-          {gutterfold && (
+        <div className="rounded-md border border-border bg-secondary/20 p-3">
+          <p className="text-xs font-semibold text-foreground">{PACKING_LABEL[config.packingPolicy]}</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            Distância adicional entre {gutterfold ? "peças" : "cartas"}: {packing.gapMm} mm.
+            {config.packingPolicy === "personalizado"
+              ? " Você controla esta medida abaixo."
+              : " O sistema mantém esta medida compatível com a escolha feita em Sangria."}
+          </p>
+        </div>
+        {gutterfold && (
+          <div className="space-y-2 rounded-md border border-primary/30 bg-primary/10 p-3">
             <Field
-              label="Canaleta (mm)"
+              label="Canaleta da dobra (mm)"
               value={config.gutterfoldGapMm}
               min={0}
               max={30}
               onChange={(value) => composer.setConfig({ ...config, gutterfoldGapMm: value })}
             />
-          )}
-        </div>
-        {gutterfold && (
-          <div className="space-y-1 rounded-md border border-primary/30 bg-primary/10 p-3">
             <p className="text-[11px] leading-relaxed text-primary">
-              A canaleta fica entre frente e verso para dobrar a peça. Ela é impressa como guia,
-              mas nunca vira linha de corte.
+              Em 0 mm, frente e verso encostam exatamente na dobra. A canaleta nunca vira linha de corte.
             </p>
             <HelpButton topic="canaleta-gutterfold" label="entenda a canaleta" />
+          </div>
+        )}
+        {gutterfold && (
+          <div className="space-y-2 pt-2">
+            <SectionLabel help="direcao-gutterfold">Direção da dobra</SectionLabel>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                ["auto", "Automática", Sparkles],
+                ["horizontal", "Horizontal", ArrowDownUp],
+                ["vertical", "Vertical", ArrowLeftRight],
+              ] as const).map(([value, label, Icon]) => (
+                <Button
+                  key={value}
+                  variant={config.gutterfoldDirection === value ? "default" : "outline"}
+                  className="h-auto min-w-0 flex-col gap-1 px-1.5 py-2 text-[10px]"
+                  disabled={!wholeSheet}
+                  onClick={() => composer.setConfig({ ...config, gutterfoldDirection: value })}
+                >
+                  <Icon className="size-4" />
+                  {label}
+                </Button>
+              ))}
+            </div>
+            <p className="text-[10px] leading-relaxed text-muted-foreground">
+              {wholeSheet
+                ? "Em Automática, o sistema usa a direção que comporta mais cartas. A prévia mostra a escolha."
+                : "Não é possível escolher a direção porque “Carta por carta” está ativo em Acabamento."}
+            </p>
           </div>
         )}
       </section>
 
       <section className="space-y-3 border-t border-border pt-5">
-        <SectionLabel help="grade">Grade da folha</SectionLabel>
-        <GridPanel composer={composer} />
+        <AdvancedSection
+          title="Ajustes avançados da folha"
+          summary="Distância manual, compartilhamento e grade"
+          defaultOpen={config.packingPolicy === "personalizado" || config.gridMode === "manual"}
+        >
+          <div className="space-y-2">
+            <SectionLabel help="espaco-cartas">Organização personalizada</SectionLabel>
+            <Button
+              type="button"
+              variant={config.packingPolicy === "personalizado" ? "default" : "outline"}
+              className="h-auto w-full justify-start whitespace-normal py-2 text-left text-xs"
+              onClick={() => composer.setConfig({ ...config, ...packingPatch("personalizado", config) })}
+            >
+              Editar as medidas manualmente
+            </Button>
+            <DisabledConfig
+              disabled={config.packingPolicy !== "personalizado"}
+              reason={`Não é possível editar estas medidas porque a organização ${PACKING_LABEL[config.packingPolicy]} está ativa em Sangria.`}
+            >
+              <div className="space-y-3">
+                <Select
+                  disabled={config.packingPolicy !== "personalizado"}
+                  value={config.bleedMode}
+                  onValueChange={(bleedMode) => composer.setConfig({ ...config, bleedMode: bleedMode as BleedMode })}
+                >
+                  <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="completa">Margem completa por carta</SelectItem>
+                    <SelectItem value="compartilhada">Margem compartilhada</SelectItem>
+                    <SelectItem value="colada">Cartas coladas</SelectItem>
+                  </SelectContent>
+                </Select>
+                <DisabledConfig
+                  disabled={config.packingPolicy !== "personalizado" || config.bleedMode === "colada"}
+                  reason={config.bleedMode === "colada"
+                    ? "Não é possível acrescentar distância porque Cartas coladas corta na divisa."
+                    : "Não é possível editar a distância porque a organização guiada está ativa."}
+                >
+                  <Field
+                    label={`Distância adicional entre ${gutterfold ? "peças" : "cartas"} (mm)`}
+                    value={config.gapMm}
+                    disabled={config.packingPolicy !== "personalizado" || config.bleedMode === "colada"}
+                    onChange={(gapMm) => composer.setConfig({ ...config, gapMm })}
+                  />
+                </DisabledConfig>
+              </div>
+            </DisabledConfig>
+            {config.packingPolicy === "personalizado" && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 w-full text-xs"
+                onClick={() => composer.setConfig({ ...config, ...packingPatch("seguro", config) })}
+              >
+                Voltar ao cálculo automático Seguro
+              </Button>
+            )}
+          </div>
+          <div className="border-t border-border pt-3">
+            <SectionLabel help="grade">Grade da folha</SectionLabel>
+            <div className="mt-3"><GridPanel composer={composer} /></div>
+          </div>
+        </AdvancedSection>
       </section>
 
       {isCricut ? (
@@ -210,7 +315,7 @@ export function SheetPanel({
         <div>
           <p className="text-[11px] text-muted-foreground">Nesta folha</p>
           <p className="text-sm font-bold text-foreground">
-            Cabem {grid.perSheet} {gutterfold ? "peça(s)" : "carta(s)"} por folha
+            Cabem {grid.perSheet} {gutterfold && !wholeSheet ? "peça(s)" : "carta(s)"} por folha
           </p>
         </div>
         <p className="max-w-[150px] text-right text-[10px] leading-snug text-muted-foreground">

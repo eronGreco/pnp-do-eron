@@ -19,7 +19,7 @@ import { gridFor } from "@/composer/layoutSheets";
 import { pageSizeMm, paperAllowed } from "@/composer/paperSizes";
 import { DEFAULT_COMPOSER_CONFIG } from "@/composer/types";
 import { backImageFor } from "@/composer/pairFrontBack";
-import { normalizeSliceConfig, sliceFileName, sliceRects } from "@/slicer/sliceGeometry";
+import { normalizeSliceConfig, scaledSliceSize, sliceFileName, sliceRects } from "@/slicer/sliceGeometry";
 import { DEFAULT_SLICE_CONFIG, type SliceConfig } from "@/slicer/types";
 import { edgeFillPixels, fillCardEdges } from "@/slicer/cornerFill";
 
@@ -966,6 +966,14 @@ describe("W. fatiador de folhas", () => {
     expect(config.overshootPx).toBe(200);
     expect(normalizeSliceConfig({ cornerFillCornerPercent: 9999 }).cornerFillCornerPercent).toBe(30);
     expect(normalizeSliceConfig({ cornerFillEdgePercent: 9999 }).cornerFillEdgePercent).toBe(10);
+    expect(normalizeSliceConfig({ outputDpi: 200 as 300 }).outputDpi).toBe(300);
+    expect(normalizeSliceConfig({ outputFormat: "gif" as "png" }).outputFormat).toBe("png");
+  });
+
+  it("redimensiona proporcionalmente tomando 300 DPI como referencia", () => {
+    expect(scaledSliceSize(600, 900, 150)).toEqual({ width: 300, height: 450 });
+    expect(scaledSliceSize(600, 900, 300)).toEqual({ width: 600, height: 900 });
+    expect(scaledSliceSize(600, 900, 600)).toEqual({ width: 1200, height: 1800 });
   });
 
   it("preenche cantos e laterais apenas com pixels da propria carta", () => {

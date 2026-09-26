@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Layers, Sparkles } from "lucide-react";
+import { Check, Layers, ShieldCheck, Sparkles, StretchHorizontal, UnfoldHorizontal } from "lucide-react";
 import type { Composer } from "@/composer/useComposer";
 import {
   BLEED_METHOD_HELP,
@@ -23,6 +23,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { HelpButton } from "@/components/HelpButton";
 import type { HelpTopicId } from "@/help/helpTopics";
+import { DisabledConfig } from "@/components/panels/DisabledConfig";
+import { AdvancedSection } from "@/components/panels/AdvancedSection";
+import { effectivePacking, packingPatch } from "@/composer/packingPolicy";
+import type { PackingPolicy } from "@/composer/types";
 
 const METHODS: BleedMethod[] = ["esticar", "espelhar", "cor", "esticar-desfoque"];
 
@@ -51,16 +55,18 @@ function ToggleRow({
   description,
   ariaLabel,
   onChange,
+  disabled = false,
 }: {
   checked: boolean;
   label: string;
   description?: string;
   ariaLabel: string;
   onChange: (checked: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
-    <label className="flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3">
-      <Switch checked={checked} onCheckedChange={onChange} aria-label={ariaLabel} />
+    <label className={`flex items-start gap-3 rounded-lg border border-border bg-background/50 p-3 ${disabled ? "opacity-45" : ""}`}>
+      <Switch checked={checked} onCheckedChange={onChange} aria-label={ariaLabel} disabled={disabled} />
       <span className="min-w-0 space-y-1">
         <span className="block text-xs font-semibold text-foreground">{label}</span>
         {description && <span className="block text-[11px] leading-relaxed text-muted-foreground">{description}</span>}
@@ -73,14 +79,16 @@ function MethodControls({
   value,
   onChange,
   helpTopic = "metodos-sangria",
+  disabled = false,
 }: {
   value: BleedConfig;
   onChange: (patch: Partial<BleedConfig>) => void;
   helpTopic?: HelpTopicId;
+  disabled?: boolean;
 }) {
   return (
     <div className="space-y-3">
-      <Select value={value.method} onValueChange={(method) => onChange({ method: method as BleedMethod })}>
+      <Select disabled={disabled} value={value.method} onValueChange={(method) => onChange({ method: method as BleedMethod })}>
         <SelectTrigger className="h-10 gap-2 [&>span]:min-w-0 [&>span]:truncate">
           <SelectValue />
         </SelectTrigger>
@@ -106,6 +114,7 @@ function MethodControls({
             </span>
             <Switch
               checked={value.useAverageColor}
+              disabled={disabled}
               onCheckedChange={(checked) => onChange({ useAverageColor: checked })}
             />
           </label>
@@ -114,6 +123,7 @@ function MethodControls({
               <Input
                 type="color"
                 value={value.color}
+                disabled={disabled}
                 onChange={(event) => onChange({ color: event.target.value })}
                 className="h-9 w-16 p-1"
                 aria-label="Cor da sangria"
@@ -135,6 +145,7 @@ function MethodControls({
             max={10}
             step={1}
             value={value.blurStrength}
+            disabled={disabled}
             ariaLabel="Desfoque"
             onChange={(blurStrength) => onChange({ blurStrength })}
           />
@@ -143,13 +154,19 @@ function MethodControls({
 
       <ToggleRow
         checked={value.trimEnabled}
+        disabled={disabled}
         onChange={(trimEnabled) => onChange({ trimEnabled })}
         ariaLabel="Aparar a borda da arte"
         label="Aparar a borda antes de criar"
         description="Use quando a arte tem uma sobra branca ou canto arredondado já impresso."
       />
       <HelpButton topic="aparar-borda" label="entenda o aparar a borda" />
-      {value.trimEnabled && (
+      <DisabledConfig
+        disabled={!value.trimEnabled || disabled}
+        reason={disabled
+          ? "Não é possível editar a faixa porque a criação de sangria está desligada."
+          : "Não é possível editar a faixa porque “Aparar a borda antes de criar” está desligado."}
+      >
         <div className="space-y-2 rounded-lg border border-border bg-background/45 p-3">
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-muted-foreground">Faixa aparada (mm)</span>
@@ -160,11 +177,12 @@ function MethodControls({
             max={5}
             step={0.5}
             value={value.trimMm}
+            disabled={!value.trimEnabled || disabled}
             ariaLabel="Faixa aparada"
             onChange={(trimMm) => onChange({ trimMm })}
           />
         </div>
-      )}
+      </DisabledConfig>
     </div>
   );
 }
@@ -172,6 +190,14 @@ function MethodControls({
 export function BleedPanel({ composer }: { composer: Composer }) {
   const { config, cards, imageById } = composer;
   const gutterfold = config.assemblyMode === "gutterfold";
+  const glued = effectivePacking(config).mode === "colada";
+  const gluedSource = config.packingPolicy === "personalizado"
+    ? "a organização personalizada está em Cartas coladas"
+    : "“Cartas coladas” está ativa em Como organizar na folha";
+  // No gutterfold com cartas coladas a margem da frente e a do verso viram 0 mm
+  // no cálculo, então os campos ficam bloqueados com a explicação.
+  const frontMarginLocked = glued && gutterfold;
+  const backMarginLocked = glued && gutterfold;
   const [editing, setEditing] = useState<string | null>(null);
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyTargets, setCopyTargets] = useState<string[]>([]);
@@ -181,6 +207,16 @@ export function BleedPanel({ composer }: { composer: Composer }) {
     ? effectiveCardBleed(editingCard, config.bleed)
     : config.bleed;
   const exceptions = cards.filter((card) => cardHasOwnBleed(card)).length;
+  const packingOptions: {
+    value: Exclude<PackingPolicy, "personalizado">;
+    label: string;
+    description: string;
+    icon: typeof ShieldCheck;
+  }[] = [
+    { value: "seguro", label: "Seguro", description: "Preserva toda a margem de cada carta.", icon: ShieldCheck },
+    { value: "economico", label: "Econômico", description: "Compartilha a faixa segura para caber mais.", icon: StretchHorizontal },
+    { value: "colado", label: "Cartas coladas", description: "Corta na divisa, sem margem entre vizinhas.", icon: UnfoldHorizontal },
+  ];
 
   const setFrontBleed = (patch: Partial<BleedConfig>) => {
     if (editingCard) {
@@ -213,36 +249,68 @@ export function BleedPanel({ composer }: { composer: Composer }) {
       <HelpButton topic="etapa-sangria" variant="etapa" />
 
       <PanelBlock>
-        <SectionLabel help="sangria-mm">Sangria da frente e espaço na folha</SectionLabel>
-        <div className="grid grid-cols-2 gap-3">
+        <SectionLabel help="modo-sangria">Como organizar na folha</SectionLabel>
+        <div className="space-y-2">
+          {packingOptions.map(({ value, label, description, icon: Icon }) => {
+            const active = config.packingPolicy === value;
+            return (
+              <Button
+                key={value}
+                type="button"
+                variant={active ? "default" : "outline"}
+                className="grid h-auto w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-2 whitespace-normal px-3 py-2.5 text-left"
+                aria-pressed={active}
+                onClick={() => composer.setConfig({ ...config, ...packingPatch(value, config) })}
+              >
+                <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold">{label}</span>
+                  <span className="block text-[10px] font-normal leading-relaxed opacity-80">{description}</span>
+                </span>
+              </Button>
+            );
+          })}
+        </div>
+        {config.packingPolicy === "personalizado" && (
+          <div className="rounded-md border border-warning/40 bg-warning/10 p-2.5">
+            <p className="text-[11px] font-semibold text-foreground">Organização personalizada</p>
+            <p className="text-[10px] leading-relaxed text-muted-foreground">
+              A distância e o compartilhamento foram definidos nos Ajustes avançados da folha.
+            </p>
+          </div>
+        )}
+      </PanelBlock>
+
+      <PanelBlock>
+        <SectionLabel help="sangria-mm">Frente</SectionLabel>
+        <DisabledConfig
+          disabled={frontMarginLocked}
+          reason={`Não é possível editar a margem porque ${gluedSource}. Nesse modo o corte cai exatamente na divisa e nenhuma margem é impressa. Escolha Seguro ou Econômico para usar a margem.`}
+        >
           <Field
-            label="Sangria da frente (mm)"
+            label="Margem para o corte (mm)"
             value={config.bleedMm}
+            disabled={frontMarginLocked}
             onChange={(bleedMm) => composer.setConfig({ ...config, bleedMm })}
           />
-        </div>
-        <Select
-          value={config.bleedMode}
-          onValueChange={(bleedMode) =>
-            composer.setConfig({ ...config, bleedMode: bleedMode as typeof config.bleedMode })
-          }
-        >
-          <SelectTrigger className="h-10 gap-2 [&>span]:min-w-0 [&>span]:truncate">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="completa">Sangria completa em cada carta</SelectItem>
-            <SelectItem value="compartilhada">Sangria compartilhada, ocupa menos espaço</SelectItem>
-            <SelectItem value="colada">Cartas coladas, sem sangria entre elas</SelectItem>
-          </SelectContent>
-        </Select>
-        <HelpButton topic="modo-sangria" label="entenda os modos de sangria" />
-        <InfoLine>
-          {gutterfold
-            ? "Esta parte define a margem da frente, que fica à esquerda da peça. Ela nunca atravessa a canaleta nem invade o verso."
-            : "Esta parte define quanto a frente ocupa na folha. Pode ficar em 0 mm quando a frente já está pronta para cortar na linha."}
-        </InfoLine>
+        </DisabledConfig>
+        {!frontMarginLocked && glued && (
+          <div className="rounded-md border border-warning/40 bg-warning/10 p-2.5">
+            <p className="text-[11px] font-semibold text-foreground">Com Cartas coladas, nada é impresso além do corte</p>
+            <p className="text-[10px] leading-relaxed text-muted-foreground">
+              Aqui a medida só diz quanto da borda da imagem é descartado na divisa. Ela não cria margem nem afasta as cartas. Para ter margem de verdade, escolha Seguro ou Econômico.
+            </p>
+          </div>
+        )}
+        {!glued && (
+          <InfoLine>
+            {gutterfold
+              ? "A margem fica isolada na frente e nunca atravessa a dobra, o verso ou outra carta."
+              : "Essa é a tinta extra ao redor da linha de corte. Pode ficar em 0 mm quando a arte já termina exatamente na linha."}
+          </InfoLine>
+        )}
       </PanelBlock>
+
 
       {cards.length > 0 && withoutSangria > 0 && (
         <div className="flex gap-2.5 rounded-lg border border-warning/30 bg-warning/10 p-3">
@@ -266,35 +334,65 @@ export function BleedPanel({ composer }: { composer: Composer }) {
           label="Criar sangria nas frentes"
           description="Inventa uma faixa quando a imagem da frente veio cortada rente à carta."
         />
-        {active.enabled && <MethodControls value={active} onChange={setFrontBleed} />}
+        <AdvancedSection title="Ajustes avançados da frente" summary="Método, aparo, cor e desfoque">
+          <DisabledConfig
+            disabled={!active.enabled}
+            reason="Não é possível editar o método porque “Criar sangria nas frentes” está desligado."
+          >
+            <MethodControls value={active} onChange={setFrontBleed} disabled={!active.enabled} />
+          </DisabledConfig>
+        </AdvancedSection>
       </PanelBlock>
 
       <PanelBlock>
-        <SectionLabel help="sangria-fake-verso">Sangria só no verso</SectionLabel>
+        <SectionLabel help="sangria-fake-verso">Verso</SectionLabel>
+        <DisabledConfig
+          disabled={backMarginLocked}
+          reason={`Não é possível editar a margem do verso porque ${gluedSource}. O verso também é cortado na divisa. Para prolongar a imagem do verso, use “Criar margem na imagem do verso”.`}
+        >
+          <Field
+            label="Margem do verso (mm)"
+            value={effectiveBackBleedMm(config)}
+            min={0}
+            max={20}
+            disabled={backMarginLocked}
+            onChange={(backBleedMm) => composer.setConfig({ ...config, backBleedMm })}
+          />
+          {config.backBleedMm == null ? (
+            <InfoLine>A margem do verso acompanha a frente: {config.bleedMm} mm.</InfoLine>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-full text-xs"
+              disabled={backMarginLocked}
+              onClick={() => composer.setConfig({ ...config, backBleedMm: null })}
+            >
+              Fazer o verso acompanhar a frente
+            </Button>
+          )}
+        </DisabledConfig>
         <ToggleRow
           checked={config.backBleed.enabled}
           onChange={(enabled) => composer.setConfig({ ...config, backBleed: { ...config.backBleed, enabled } })}
           ariaLabel="Criar sangria no verso"
-          label="Criar sangria no verso"
-          description="Cria a mesma faixa da frente, mas só na imagem do verso, sem mexer na frente e sem mudar o corte."
+          label="Criar margem na imagem do verso"
+          description="Prolonga a imagem quando ela não tem tinta suficiente ao redor do corte."
         />
-        <div className="grid grid-cols-2 gap-3">
-          <Field
-            label="Faixa do verso (mm)"
-            value={config.backExtraBleedMm}
-            min={0}
-            max={20}
-            onChange={(backExtraBleedMm) => composer.setConfig({ ...config, backExtraBleedMm })}
-          />
-          <Field
-            label="Enquadramento (mm)"
-            value={effectiveBackBleedMm(config)}
-            min={0}
-            max={20}
-            onChange={(backBleedMm) => composer.setConfig({ ...config, backBleedMm })}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
+        <AdvancedSection title="Ajustes avançados do verso" summary="Prolongamento, redução, método, aparo e cor">
+          <DisabledConfig
+            disabled={!config.backBleed.enabled}
+            reason="Não é possível editar o prolongamento porque “Criar margem na imagem do verso” está desligado."
+          >
+            <Field
+              label="Prolongar além do corte (mm)"
+              value={config.backExtraBleedMm}
+              min={0}
+              max={20}
+              disabled={!config.backBleed.enabled}
+              onChange={(backExtraBleedMm) => composer.setConfig({ ...config, backExtraBleedMm })}
+            />
+          </DisabledConfig>
           <Field
             label="Reduzir a arte do verso (mm)"
             value={config.backInsetMm}
@@ -302,25 +400,14 @@ export function BleedPanel({ composer }: { composer: Composer }) {
             max={10}
             onChange={(backInsetMm) => composer.setConfig({ ...config, backInsetMm })}
           />
-        </div>
-        <InfoLine>
-          Reduzir a arte encolhe só a imagem do verso ao redor do centro, então a borda sólida dela
-          sobra mais para dentro da carta. O corte, a frente e a grade continuam iguais. Se a
-          redução passar da faixa do verso, começa a aparecer folha branca junto da linha de corte.
-        </InfoLine>
-        {config.backBleedMm != null && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 w-full text-xs"
-            onClick={() => composer.setConfig({ ...config, backBleedMm: null })}
+          <InfoLine>Reduzir a arte expõe mais da borda do verso sem mudar o corte ou a grade.</InfoLine>
+          <DisabledConfig
+            disabled={!config.backBleed.enabled}
+            reason="Não é possível editar o método porque “Criar margem na imagem do verso” está desligado."
           >
-            Enquadramento acompanha a frente ({config.bleedMm} mm)
-          </Button>
-        )}
-        {config.backBleed.enabled && (
-          <MethodControls value={config.backBleed} onChange={setBackBleed} helpTopic="sangria-fake-verso" />
-        )}
+            <MethodControls value={config.backBleed} onChange={setBackBleed} helpTopic="sangria-fake-verso" disabled={!config.backBleed.enabled} />
+          </DisabledConfig>
+        </AdvancedSection>
         <InfoLine>
           {gutterfold
             ? "No gutterfold essa margem vale só para o verso, que fica à direita. Ela não invade a frente, a canaleta nem outra peça, e não muda o contorno de corte."
@@ -329,6 +416,7 @@ export function BleedPanel({ composer }: { composer: Composer }) {
       </PanelBlock>
 
       {cards.length > 0 && (
+        <AdvancedSection title="Ajustes por carta" summary={`${exceptions} carta(s) com exceção própria`}>
         <PanelBlock>
           <SectionLabel help="excecoes-carta">Ajustes por carta na frente</SectionLabel>
           <InfoLine>Toque em uma carta para mudar só a sangria criada na frente dela.</InfoLine>
@@ -502,6 +590,7 @@ export function BleedPanel({ composer }: { composer: Composer }) {
             </Button>
           )}
         </PanelBlock>
+        </AdvancedSection>
       )}
 
       <InfoLine>O resultado aparece na prévia principal das folhas, ao lado.</InfoLine>

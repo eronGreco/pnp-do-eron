@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, Maximize, Minus, Plus, Square, SquareCheckBig } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Info, Loader2, Maximize, Minus, Plus, Square, SquareCheckBig } from "lucide-react";
 import type { Composer } from "@/composer/useComposer";
 import {
   backClipRect,
@@ -22,6 +22,8 @@ import { sensorSafeZonesMm } from "@/cut/geometry";
 import { manualMarkCss, manualMarkRectsMm, marksOnSide } from "@/cut/manualMarks";
 import { cricutMarkRectsMm, templatePageForSheet } from "@/cricut/markTemplate";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
 import type { Rect } from "@/cameo/types";
 
 const GAP_MM = 9;
@@ -126,6 +128,7 @@ export function LayoutPreview({
   const gutterfold = isGutterfold(config);
   const side = gutterfold ? "front" : previewSide;
   const cameoMode = config.finishMode === "cameo";
+  const cameoMarksSide = gutterfold ? "front" : config.cameoRegistrationSide;
   const cricutMarkPage =
     config.finishMode === "cricut" && side === "front"
       ? templatePageForSheet(composer.cricutMarks, layout.number)
@@ -371,6 +374,7 @@ export function LayoutPreview({
                           y={backR.y0}
                           width={backR.x1 - backR.x0}
                           height={backR.y1 - backR.y0}
+                          transform={placement.backRotationDeg === 180 ? `rotate(180 ${(backR.x0 + backR.x1) / 2} ${(backR.y0 + backR.y1) / 2})` : undefined}
                         />
                       ) : (
                         <rect
@@ -462,6 +466,43 @@ export function LayoutPreview({
       >
         {showCutLines ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
       </Button>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-6 shrink-0"
+            aria-label="Sobre esta prévia"
+            title="Sobre esta prévia"
+          >
+            <Info className="size-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-72 text-xs leading-relaxed text-muted-foreground">
+          <p className="mb-1.5 text-[11px] font-semibold text-foreground">
+            Prévia rápida da folha {layout.number} de {layouts.length}
+          </p>
+          <p>
+            Clique em uma carta para marcar ou desmarcar o corte e arraste uma sobre a outra para trocar de lugar: o verso acompanha.
+          </p>
+          {gutterfold ? (
+            <p className="mt-1.5">
+              {config.gutterfoldLayout === "sheet"
+                ? `Gutterfold de folha inteira: dobra ${layout.sheetFoldDirection === "horizontal" ? "horizontal" : "vertical"}. Dobre a folha primeiro e corte as cartas depois.`
+                : "Modo gutterfold: frente e verso ficam na mesma peça, com dobra no centro e corte só no contorno externo."}
+            </p>
+          ) : side === "back" ? (
+            <p className="mt-1.5">
+              Enquadramento do verso: {effectiveBackBleedMm(config)} mm. Sangria do verso: {effectiveBackExtraBleedMm(config)} mm.
+              {config.backOffsetXMm !== 0 || config.backOffsetYMm !== 0
+                ? ` Deslocamento: ${config.backOffsetXMm} mm na horizontal e ${config.backOffsetYMm} mm na vertical.`
+                : ""}
+            </p>
+          ) : null}
+        </PopoverContent>
+      </Popover>
+
 
       <div className="ml-auto flex shrink-0 items-center gap-1">
         <Button size="icon" variant="ghost" className="size-6" onClick={() => zoomBy(1 / 1.25)} aria-label="Diminuir zoom" title="Diminuir zoom">
@@ -611,6 +652,7 @@ export function LayoutPreview({
                     width={backImageRect(placement, config).x1 - backImageRect(placement, config).x0}
                     height={backImageRect(placement, config).y1 - backImageRect(placement, config).y0}
                     preserveAspectRatio="none"
+                    transform={placement.backRotationDeg === 180 ? `rotate(180 ${(backImageRect(placement, config).x0 + backImageRect(placement, config).x1) / 2} ${(backImageRect(placement, config).y0 + backImageRect(placement, config).y1) / 2})` : undefined}
                     clipPath={`url(#clip-back-${layout.number}-${placement.number})`}
                     onLoad={() => markLoaded(gutterBackImage.previewUrl)}
                   />
@@ -644,17 +686,8 @@ export function LayoutPreview({
                       stroke="oklch(0.2 0.02 250 / 0.35)"
                       strokeWidth={0.25}
                     />
-                    {placement.gutterRectMm && (
-                      <line
-                        x1={(placement.gutterRectMm.x0 + placement.gutterRectMm.x1) / 2}
-                        y1={placement.gutterRectMm.y0}
-                        x2={(placement.gutterRectMm.x0 + placement.gutterRectMm.x1) / 2}
-                        y2={placement.gutterRectMm.y1}
-                        stroke="oklch(0.45 0.03 250)"
-                        strokeWidth={0.35}
-                        strokeDasharray="2 1.5"
-                        pointerEvents="none"
-                      />
+                    {placement.gutterRectMm && !layout.sheetFoldRectMm && (
+                      <line x1={(placement.gutterRectMm.x0 + placement.gutterRectMm.x1) / 2} y1={placement.gutterRectMm.y0} x2={(placement.gutterRectMm.x0 + placement.gutterRectMm.x1) / 2} y2={placement.gutterRectMm.y1} stroke="oklch(0.45 0.03 250)" strokeWidth={0.35} strokeDasharray="2 1.5" pointerEvents="none" />
                     )}
                   </>
                 )}
@@ -695,6 +728,23 @@ export function LayoutPreview({
               </g>
             );
           })}
+
+          {layout.sheetFoldRectMm && (() => {
+            const fold = layout.sheetFoldRectMm;
+            const horizontal = fold.x1 - fold.x0 > fold.y1 - fold.y0;
+            return (
+              <line
+                x1={horizontal ? fold.x0 : (fold.x0 + fold.x1) / 2}
+                y1={horizontal ? (fold.y0 + fold.y1) / 2 : fold.y0}
+                x2={horizontal ? fold.x1 : (fold.x0 + fold.x1) / 2}
+                y2={horizontal ? (fold.y0 + fold.y1) / 2 : fold.y1}
+                stroke="oklch(0.45 0.03 250)"
+                strokeWidth={0.5}
+                strokeDasharray="3 2"
+                pointerEvents="none"
+              />
+            );
+          })()}
 
           {/* Espaço que abre entre as cartas durante o arraste */}
           {insertionLine && (
@@ -816,7 +866,7 @@ export function LayoutPreview({
             ))}
 
           {cameoMode &&
-            side === "front" &&
+            side === cameoMarksSide &&
             registrationWhiteBackdropsMm(
               page.widthMm,
               page.heightMm,
@@ -833,7 +883,7 @@ export function LayoutPreview({
             ))}
 
           {cameoMode &&
-            side === "front" &&
+            side === cameoMarksSide &&
             registrationShapesMm(page.widthMm, page.heightMm).map((mark, index) => (
               <rect
                 key={`mark-${index}`}
@@ -870,19 +920,6 @@ export function LayoutPreview({
         )}
       </div>
 
-      <p className="text-center text-xs text-muted-foreground">
-        Prévia rápida da folha {layout.number} de {layouts.length}. Clique em uma carta para marcar
-        ou desmarcar o corte e arraste uma sobre a outra para trocar de lugar: o verso acompanha.
-        {gutterfold
-          ? ` Modo gutterfold: frente e verso ficam na mesma peça, com dobra no centro e corte só no contorno externo.`
-          : side === "back"
-          ? ` Enquadramento do verso: ${effectiveBackBleedMm(config)} mm. Sangria do verso: ${effectiveBackExtraBleedMm(config)} mm.${
-              config.backOffsetXMm !== 0 || config.backOffsetYMm !== 0
-                ? ` Deslocamento: ${config.backOffsetXMm} mm na horizontal e ${config.backOffsetYMm} mm na vertical.`
-                : ""
-            }`
-          : ""}
-      </p>
     </div>
   );
 }

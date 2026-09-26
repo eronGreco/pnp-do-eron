@@ -29,7 +29,8 @@ export function CutExportPanel({
   const sheets = exportSheetsFrom(composer.layouts, pageSizeMm(composer.config));
   const total = sheets.reduce((sum, sheet) => sum + sheet.rects.length, 0);
   const gutterfold = composer.config.assemblyMode === "gutterfold";
-  const unit = gutterfold ? "peça(s)" : "carta(s)";
+  const wholeSheet = gutterfold && composer.config.gutterfoldLayout === "sheet";
+  const unit = gutterfold && !wholeSheet ? "peça(s)" : "carta(s)";
 
   const run = async (format: "dxf" | "svg") => {
     if (sheets.length === 0) {
@@ -124,7 +125,9 @@ export function CutExportPanel({
         <HelpButton topic="exportar-corte" />
       </div>
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        {gutterfold
+        {wholeSheet
+          ? "Arquivo com o contorno final das cartas na metade usada como referência depois da dobra. A dobra central não é exportada como corte."
+          : gutterfold
           ? "Arquivo só com o contorno externo das peças, sem imagem. A dobra central não é exportada como corte."
           : "Arquivo só com o contorno das cartas, sem imagem. Serve para cortar em outro programa."}
       </p>
@@ -150,7 +153,7 @@ export function CutExportPanel({
       </div>
       <p className="text-[10px] text-muted-foreground">
         {sheets.length === 0
-          ? `Nenhuma ${gutterfold ? "peça" : "carta"} marcada para corte ainda.`
+          ? `Nenhuma ${gutterfold && !wholeSheet ? "peça" : "carta"} marcada para corte ainda.`
           : `${total} ${unit} marcada(s) em ${sheets.length} folha(s). Com mais de uma folha, sai um .zip.`}
       </p>
       {section === "all" && cricutBlock}

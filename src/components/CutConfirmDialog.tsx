@@ -32,6 +32,11 @@ export function CutConfirmDialog({
   onConfirm,
 }: Props) {
   const gutterfold = sheet.assemblyMode === "gutterfold";
+  const registrationSide = sheet.registrationSide === "back" ? "verso" : "frente";
+  const registrationPageIndex =
+    sheet.registrationSide === "back" && sheet.backPageIndex !== null
+      ? sheet.backPageIndex
+      : sheet.frontPageIndex;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -40,13 +45,16 @@ export function CutConfirmDialog({
           <DialogDescription>
             {gutterfold
               ? "Confirme que a folha gutterfold está carregada na Cameo. A dobra central não será cortada."
-              : "Confirme que a frente desta folha está carregada na Cameo."}
+              : `Confirme que o ${registrationSide} desta folha está carregado virado para cima na Cameo.`}
           </DialogDescription>
         </DialogHeader>
 
         <dl className="space-y-1 rounded-md border border-border bg-background/60 p-3 text-sm">
           <Row label="Folha" value={`${sheet.number} de ${totalSheets}`} />
-          <Row label={gutterfold ? "Página" : "Página da frente"} value={`${sheet.frontPageIndex + 1}`} />
+          <Row
+            label={gutterfold ? "Página" : `Página do ${registrationSide}`}
+            value={`${registrationPageIndex + 1}`}
+          />
           <Row
             label={gutterfold ? "Peças" : "Cartas"}
             value={cards.map((card) => card.number).join(", ") || "nenhuma"}

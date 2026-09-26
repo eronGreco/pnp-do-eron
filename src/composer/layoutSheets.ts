@@ -1,14 +1,13 @@
 import type { Rect } from "@/cameo/types";
 import {
   A4_LANDSCAPE_W_MM,
-  REG_ARM_MM,
-  REG_INSET_MM,
   rect,
   rectsIntersect,
-  registrationWhiteBackdropsMm,
+  registrationShapesMm,
 } from "@/cut/geometry";
 import { manualMarkMarginMm } from "@/cut/manualMarks";
 import { pageSizeMm } from "./paperSizes";
+import { effectivePacking } from "./packingPolicy";
 import type { ComposerCard, ComposerConfig } from "./types";
 
 export type PlacedCard = {
@@ -30,11 +29,16 @@ export type PlacedCard = {
   backImageRectMm?: Rect;
   /** Area visivel da arte do verso gutterfold. */
   backClipRectMm?: Rect;
+  /** Rotação visual do verso para que ele alinhe depois de dobrar a folha. */
+  backRotationDeg?: 0 | 180;
 };
 
 export type ComposerSheetLayout = {
   number: number;
   placements: PlacedCard[];
+  /** Dobra única da folha inteira. */
+  sheetFoldRectMm?: Rect;
+  sheetFoldDirection?: "horizontal" | "vertical";
 };
 
 export type GridInfo = {
@@ -62,6 +66,10 @@ export function isGutterfold(config: ComposerConfig): boolean {
   return config.assemblyMode === "gutterfold";
 }
 
+export function isWholeSheetGutterfold(config: ComposerConfig): boolean {
+  return isGutterfold(config) && config.gutterfoldLayout === "sheet";
+}
+
 export function gutterfoldGapMm(config: ComposerConfig): number {
   const value = config.gutterfoldGapMm;
   if (!Number.isFinite(value)) return 0;
@@ -69,7 +77,7 @@ export function gutterfoldGapMm(config: ComposerConfig): number {
 }
 
 export function cutWidthFor(config: ComposerConfig): number {
-  return isGutterfold(config)
+  return isGutterfold(config) && !isWholeSheetGutterfold(config)
     ? config.cardWidthMm * 2 + gutterfoldGapMm(config)
     : config.cardWidthMm;
 }
@@ -97,12 +105,17 @@ type Metrics = {
   bleedOffset: number;
 };
 
+function spacingMm(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
 function metrics(config: ComposerConfig): Metrics {
   const cutW = cutWidthFor(config);
   const cutH = cutHeightFor(config);
+  const packing = effectivePacking(config);
   // "colada": a sangria deixa de existir, as cartas ficam encostadas e o corte
   // acontece exatamente na divisa entre elas.
-  if (config.bleedMode === "colada") {
+  if (packing.mode === "colada") {
     return {
       cellW: cutW,
       cellH: cutH,
@@ -115,15 +128,15 @@ function metrics(config: ComposerConfig): Metrics {
 
   const cellW = cutW + config.bleedMm * 2;
   const cellH = cutH + config.bleedMm * 2;
-  const shared = config.bleedMode === "compartilhada";
+  const shared = packing.mode === "compartilhada";
   const pitchW = shared ? cutW + config.bleedMm : cellW;
   const pitchH = shared ? cutH + config.bleedMm : cellH;
 
   return {
     cellW,
     cellH,
-    stepX: pitchW + config.gapMm,
-    stepY: pitchH + config.gapMm,
+    stepX: pitchW + spacingMm(packing.gapMm),
+    stepY: pitchH + spacingMm(packing.gapMm),
     clipInset: shared ? config.bleedMm / 2 : config.bleedMm,
     bleedOffset: config.bleedMm,
   };
@@ -131,7 +144,7 @@ function metrics(config: ComposerConfig): Metrics {
 
 function fit(usable: number, cell: number, step: number): number {
   if (cell <= 0 || step <= 0 || usable < cell) return 0;
-  return Math.floor((usable - cell) / step) + 1;
+  return Math.floor((usable - cell + 1e-7) / step) + 1;
 }
 
 /**
@@ -144,21 +157,70 @@ const MARK_CLEARANCE_MM = 1;
 function blockedAreas(config: ComposerConfig): Rect[] {
   if (config.finishMode !== "cameo") return [];
   const page = pageSizeMm(config);
-  return registrationWhiteBackdropsMm(page.widthMm, page.heightMm, MARK_CLEARANCE_MM);
+  return registrationShapesMm(page.widthMm, page.heightMm).map((mark) =>
+    rect(
+      Math.max(0, mark.x0 - MARK_CLEARANCE_MM),
+      Math.max(0, mark.y0 - MARK_CLEARANCE_MM),
+      Math.min(page.widthMm, mark.x1 + MARK_CLEARANCE_MM),
+      Math.min(page.heightMm, mark.y1 + MARK_CLEARANCE_MM),
+    ),
+  );
 }
 
 type SlotGeometry = { x: number; y: number };
 
 /** Posicoes fixas da grade cheia, alinhadas em X e Y e centralizadas na folha. */
+function wholeSheetCapacity(config: ComposerConfig, direction: "horizontal" | "vertical") {
+  const m = metrics(config);
+  const page = pageSizeMm(config);
+  const edge = pageEdgeMm(config);
+  const gutter = gutterfoldGapMm(config);
+  const regionW = direction === "vertical" ? (page.widthMm - gutter) / 2 : page.widthMm;
+  const regionH = direction === "horizontal" ? (page.heightMm - gutter) / 2 : page.heightMm;
+  // Na direcao da dobra existe borda externa em apenas um lado. A dobra nao
+  // deve consumir uma segunda margem, pois as duas faces precisam encostar nela.
+  const columns = fit(regionW - edge * (direction === "vertical" ? 1 : 2), m.cellW, m.stepX);
+  const rows = fit(regionH - edge * (direction === "horizontal" ? 1 : 2), m.cellH, m.stepY);
+  return { columns, rows, count: columns * rows };
+}
+
+export function resolvedGutterfoldDirection(config: ComposerConfig): "horizontal" | "vertical" {
+  if (config.gutterfoldDirection === "horizontal" || config.gutterfoldDirection === "vertical") {
+    return config.gutterfoldDirection;
+  }
+  const horizontal = wholeSheetCapacity(config, "horizontal");
+  const vertical = wholeSheetCapacity(config, "vertical");
+  return vertical.count > horizontal.count ? "vertical" : "horizontal";
+}
+
 function gridSlots(config: ComposerConfig, columns: number, rows: number): SlotGeometry[] {
   const m = metrics(config);
   const page = pageSizeMm(config);
-  const originX = (page.widthMm - ((columns - 1) * m.stepX + m.cellW)) / 2;
-  const originY = (page.heightMm - ((rows - 1) * m.stepY + m.cellH)) / 2;
+  const occupiedW = (columns - 1) * m.stepX + m.cellW;
+  const occupiedH = (rows - 1) * m.stepY + m.cellH;
+  let originX = (page.widthMm - occupiedW) / 2;
+  let originY = (page.heightMm - occupiedH) / 2;
+  if (isWholeSheetGutterfold(config)) {
+    const direction = resolvedGutterfoldDirection(config);
+    const gutter = gutterfoldGapMm(config);
+    if (direction === "horizontal") {
+      const halfH = (page.heightMm - gutter) / 2;
+      // A frente termina na dobra. Com canaleta zero, frente e verso se
+      // encostam exatamente no centro da folha, sem um vazio artificial.
+      originY = halfH - occupiedH;
+    } else {
+      const halfW = (page.widthMm - gutter) / 2;
+      originX = halfW - occupiedW;
+    }
+  }
   const slots: SlotGeometry[] = [];
   for (let row = 0; row < rows; row += 1) {
     for (let column = 0; column < columns; column += 1) {
-      slots.push({ x: originX + column * m.stepX, y: originY + row * m.stepY });
+      const placedColumn =
+        isWholeSheetGutterfold(config) && resolvedGutterfoldDirection(config) === "vertical"
+          ? columns - 1 - column
+          : column;
+      slots.push({ x: originX + placedColumn * m.stepX, y: originY + row * m.stepY });
     }
   }
   return slots;
@@ -180,15 +242,19 @@ export function gridFor(config: ComposerConfig): GridInfo {
   const m = metrics(config);
   const edge = pageEdgeMm(config);
   const page = pageSizeMm(config);
-  const maxColumns = fit(page.widthMm - edge * 2, m.cellW, m.stepX);
-  const maxRows = fit(page.heightMm - edge * 2, m.cellH, m.stepY);
+  const whole = isWholeSheetGutterfold(config);
+  const direction = whole ? resolvedGutterfoldDirection(config) : null;
+  const availableW = direction === "vertical" ? (page.widthMm - gutterfoldGapMm(config)) / 2 : page.widthMm;
+  const availableH = direction === "horizontal" ? (page.heightMm - gutterfoldGapMm(config)) / 2 : page.heightMm;
+  const maxColumns = fit(availableW - edge * (direction === "vertical" ? 1 : 2), m.cellW, m.stepX);
+  const maxRows = fit(availableH - edge * (direction === "horizontal" ? 1 : 2), m.cellH, m.stepY);
 
   const manualGrid = config.gridMode === "manual";
   const columns = manualGrid
-    ? Math.max(0, Math.min(maxColumns, Math.floor(config.gridColumns)))
+    ? Math.max(0, Math.min(maxColumns, Math.round(config.gridColumns)))
     : maxColumns;
   const rows = manualGrid
-    ? Math.max(0, Math.min(maxRows, Math.floor(config.gridRows)))
+    ? Math.max(0, Math.min(maxRows, Math.round(config.gridRows)))
     : maxRows;
 
   const areas = blockedAreas(config);
@@ -202,7 +268,7 @@ export function gridFor(config: ComposerConfig): GridInfo {
     maxColumns,
     maxRows,
     blockedSlots: columns * rows - free,
-    limited: manualGrid && (Math.floor(config.gridColumns) > maxColumns || Math.floor(config.gridRows) > maxRows),
+    limited: manualGrid && (Math.round(config.gridColumns) > maxColumns || Math.round(config.gridRows) > maxRows),
   };
 }
 
@@ -216,6 +282,7 @@ export function layoutSheets(
   if (grid.perSheet === 0) return [];
 
   const m = metrics(config);
+  const packing = effectivePacking(config);
   const page = pageSizeMm(config);
   const sheets: ComposerSheetLayout[] = [];
 
@@ -226,6 +293,76 @@ export function layoutSheets(
     slotIsFree(config, slot, areas),
   );
   const anyBlocked = grid.blockedSlots > 0;
+
+  if (isWholeSheetGutterfold(config)) {
+    const direction = resolvedGutterfoldDirection(config);
+    const gutterSize = gutterfoldGapMm(config);
+    const fold = direction === "horizontal"
+      ? rect(0, (page.heightMm - gutterSize) / 2, page.widthMm, (page.heightMm + gutterSize) / 2)
+      : rect((page.widthMm - gutterSize) / 2, 0, (page.widthMm + gutterSize) / 2, page.heightMm);
+
+    for (let i = 0; i < cards.length; i += grid.perSheet) {
+      const slice = cards.slice(i, i + grid.perSheet);
+      const slots = freeSlots.slice(0, slice.length);
+      const frontCuts = slots.map(({ x, y }) =>
+        rect(
+          x + m.bleedOffset,
+          y + m.bleedOffset,
+          x + m.bleedOffset + config.cardWidthMm,
+          y + m.bleedOffset + config.cardHeightMm,
+        ),
+      );
+      const backCuts = frontCuts.map((front) =>
+        direction === "horizontal"
+          ? rect(front.x0, page.heightMm - front.y1, front.x1, page.heightMm - front.y0)
+          : rect(page.widthMm - front.x1, front.y0, page.widthMm - front.x0, front.y1),
+      );
+      // Frente e verso dividem a mesma folha. Todos os recortes visiveis sao
+      // calculados contra todas as faces, nao apenas contra as do mesmo lado da
+      // dobra. Assim nenhuma sangria consegue ocupar a area de outra carta.
+      const allFaceCuts = [...frontCuts, ...backCuts];
+      const placements: PlacedCard[] = [];
+      for (let slot = 0; slot < slice.length; slot += 1) {
+        const card = slice[slot];
+        const frontCut = frontCuts[slot];
+        const backCut = backCuts[slot];
+        if (!card || !frontCut || !backCut) continue;
+        const bleed = packing.mode === "colada" ? 0 : Math.max(0, config.bleedMm);
+        const sideBleed = packing.mode === "compartilhada" ? bleed / 2 : bleed;
+        const backBleed = Math.max(gutterfoldBackSideBleed(config), effectiveBackExtraBleedMm(config));
+        const backArtBleed = backBleed - effectiveBackInsetMm(config);
+        const frontLimits = bleedLimitsAround(
+          frontCut,
+          [...allFaceCuts.filter((face) => face !== frontCut), fold],
+          page.widthMm,
+          page.heightMm,
+          sideBleed,
+        );
+        const backLimits = bleedLimitsAround(
+          backCut,
+          [...allFaceCuts.filter((face) => face !== backCut), fold],
+          page.widthMm,
+          page.heightMm,
+          backBleed,
+        );
+        placements.push({
+          card,
+          number: slot + 1,
+          cutRectMm: frontCut,
+          frontRectMm: frontCut,
+          backRectMm: backCut,
+          gutterRectMm: fold,
+          imageRectMm: rect(frontCut.x0 - sideBleed, frontCut.y0 - sideBleed, frontCut.x1 + sideBleed, frontCut.y1 + sideBleed),
+          clipRectMm: rect(frontCut.x0 - frontLimits.left, frontCut.y0 - frontLimits.top, frontCut.x1 + frontLimits.right, frontCut.y1 + frontLimits.bottom),
+          backImageRectMm: rect(backCut.x0 - backArtBleed, backCut.y0 - backArtBleed, backCut.x1 + backArtBleed, backCut.y1 + backArtBleed),
+          backClipRectMm: rect(backCut.x0 - backLimits.left, backCut.y0 - backLimits.top, backCut.x1 + backLimits.right, backCut.y1 + backLimits.bottom),
+          backRotationDeg: direction === "horizontal" ? 180 : 0,
+        });
+      }
+      sheets.push({ number: sheets.length + 1, placements, sheetFoldRectMm: fold, sheetFoldDirection: direction });
+    }
+    return sheets;
+  }
 
   for (let i = 0; i < cards.length; i += grid.perSheet) {
     const slice = cards.slice(i, i + grid.perSheet);
@@ -297,7 +434,7 @@ export function layoutSheets(
 
       // Colada: a arte continua desenhada com a sangria inteira, mas o recorte
       // acontece na divisa, entao a sangria da vizinha simplesmente desaparece.
-      const artBleed = config.bleedMode === "colada" ? config.bleedMm : 0;
+      const artBleed = packing.mode === "colada" ? config.bleedMm : 0;
 
       if (!isGutterfold(config)) {
         return {
@@ -321,20 +458,32 @@ export function layoutSheets(
 
       const bleed = Math.max(0, config.bleedMm);
       const sideBleed =
-        config.bleedMode === "colada"
+        packing.mode === "colada"
           ? 0
-          : config.bleedMode === "compartilhada"
+          : packing.mode === "compartilhada"
             ? bleed / 2
             : bleed;
       const extraBack = effectiveBackExtraBleedMm(config);
       const frontCut = rect(cutRect.x0, cutRect.y0, cutRect.x0 + config.cardWidthMm, cutRect.y1);
       const gutter = rect(frontCut.x1, cutRect.y0, frontCut.x1 + gutterfoldGapMm(config), cutRect.y1);
       const backCut = rect(gutter.x1, cutRect.y0, cutRect.x1, cutRect.y1);
-      const backBleed = Math.max(sideBleed, extraBack);
+      const backBleed = Math.max(gutterfoldBackSideBleed(config), extraBack);
       const backArtBleed = backBleed - effectiveBackInsetMm(config);
       const otherCuts = cutRects.filter((_, index) => index !== slot);
-      const frontBleedLimits = bleedLimitsAround(frontCut, otherCuts, page.widthMm, page.heightMm, sideBleed);
-      const backBleedLimits = bleedLimitsAround(backCut, otherCuts, page.widthMm, page.heightMm, backBleed);
+      const frontBleedLimits = bleedLimitsAround(
+        frontCut,
+        [...otherCuts, backCut],
+        page.widthMm,
+        page.heightMm,
+        sideBleed,
+      );
+      const backBleedLimits = bleedLimitsAround(
+        backCut,
+        [...otherCuts, frontCut],
+        page.widthMm,
+        page.heightMm,
+        backBleed,
+      );
 
       return {
         card,
@@ -361,7 +510,7 @@ export function layoutSheets(
           backCut.x1 + backArtBleed,
           backCut.y1 + backArtBleed,
         ),
-        backClipRectMm: rect(
+          backClipRectMm: rect(
           backCut.x0,
           backCut.y0 - backBleedLimits.top,
           backCut.x1 + backBleedLimits.right,
@@ -453,6 +602,17 @@ export function backFaceRect(placement: PlacedCard, config: ComposerConfig): Rec
 /** Sangria usada no enquadramento da arte do verso, sem alterar o corte. */
 export function effectiveBackBleedMm(config: ComposerConfig): number {
   return Math.max(0, config.backBleedMm ?? config.bleedMm);
+}
+
+/**
+ * Margem do verso no gutterfold. Segue a mesma política da frente: compartilhada
+ * divide ao meio e coladas corta na divisa. Sem valor próprio, repete a frente.
+ */
+function gutterfoldBackSideBleed(config: ComposerConfig): number {
+  const mode = effectivePacking(config).mode;
+  if (mode === "colada") return 0;
+  const back = effectiveBackBleedMm(config);
+  return mode === "compartilhada" ? back / 2 : back;
 }
 
 /** Sangria impressa extra do verso. Nao muda grade, frente, corte ou Cameo. */

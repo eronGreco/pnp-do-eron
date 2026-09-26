@@ -38,11 +38,23 @@ export type ComposerCard = {
  */
 export type BleedMode = "completa" | "compartilhada" | "colada";
 
+/** Política guiada para organizar as cartas ou liberar medidas manuais. */
+export type PackingPolicy = "seguro" | "economico" | "colado" | "personalizado";
+
 /** "auto" usa o maximo que cabe. "manual" usa a grade escolhida pelo usuario. */
 export type GridMode = "auto" | "manual";
 
 /** "normal" imprime frente e verso separados. "gutterfold" monta uma peça dobrável. */
 export type AssemblyMode = "normal" | "gutterfold";
+
+/** Forma do gutterfold: peça individual ou uma única dobra para a folha toda. */
+export type GutterfoldLayout = "piece" | "sheet";
+
+/** Direção pedida para a dobra da folha inteira. */
+export type GutterfoldDirection = "auto" | "horizontal" | "vertical";
+
+/** Lado da folha que recebe as marcas de leitura da Silhouette. */
+export type CameoRegistrationSide = "front" | "back";
 
 export type ComposerConfig = {
   /** Folha de impressao. A3 vale apenas no acabamento guilhotina. */
@@ -63,14 +75,21 @@ export type ComposerConfig = {
   bleedMm: number;
   gapMm: number;
   bleedMode: BleedMode;
+  packingPolicy: PackingPolicy;
   gridMode: GridMode;
   /** Cartas por linha e por coluna quando a grade e manual. */
   gridColumns: number;
   gridRows: number;
   /** Fundo branco adicional ao redor das marcas para a leitura do sensor. */
   registrationWhiteBorderMm: number;
+  /** Lado impresso que será carregado virado para cima na Silhouette. */
+  cameoRegistrationSide: CameoRegistrationSide;
   /** Forma de montar cada carta na folha. */
   assemblyMode: AssemblyMode;
+  /** Peças separadas ou a folha inteira dobrada ao meio. */
+  gutterfoldLayout: GutterfoldLayout;
+  /** Direção da dobra quando a folha inteira é usada. */
+  gutterfoldDirection: GutterfoldDirection;
   /** Espaço central de dobra no gutterfold, em mm. */
   gutterfoldGapMm: number;
   /** Verso unico aplicado a todas as cartas sem verso proprio. */
@@ -111,14 +130,18 @@ export const DEFAULT_COMPOSER_CONFIG: ComposerConfig = {
   cardWidthMm: 52,
   cardHeightMm: 52,
   bleedMm: 5,
-  gapMm: 2,
+  gapMm: 0,
   bleedMode: "completa",
+  packingPolicy: "seguro",
   gridMode: "auto",
   gridColumns: 4,
   gridRows: 2,
   registrationWhiteBorderMm: 6,
+  cameoRegistrationSide: "front",
   assemblyMode: "normal",
-  gutterfoldGapMm: 4,
+  gutterfoldLayout: "piece",
+  gutterfoldDirection: "auto",
+  gutterfoldGapMm: 0,
   sharedBackImageId: null,
   finishMode: "cameo",
   manualMarks: DEFAULT_MANUAL_MARKS,

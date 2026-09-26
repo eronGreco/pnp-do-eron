@@ -1,14 +1,15 @@
 import { useRef } from "react";
-import { ImagePlus, Package, Trash2 } from "lucide-react";
+import { FileImage, Gauge, ImagePlus, LoaderCircle, Package, Trash2 } from "lucide-react";
 import type { Slicer } from "@/slicer/useSlicer";
 import { SlicerSliderField } from "@/components/panels/SlicerSliderField";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { HelpButton } from "@/components/HelpButton";
+import { DisabledConfig } from "@/components/panels/DisabledConfig";
 
 export function SlicerPanel({ slicer }: { slicer: Slicer }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const { config, images, active, progress } = slicer;
+  const { config, images, active, progress, importing } = slicer;
   const total = images.length * config.columns * config.rows;
 
   return (
@@ -16,7 +17,7 @@ export function SlicerPanel({ slicer }: { slicer: Slicer }) {
       <input
         ref={inputRef}
         type="file"
-        accept="image/png,image/jpeg"
+        accept="application/pdf,.pdf,image/png,image/jpeg"
         multiple
         hidden
         onChange={(event) => {
@@ -28,17 +29,20 @@ export function SlicerPanel({ slicer }: { slicer: Slicer }) {
 
       <div>
         <div className="flex gap-2">
-          <Button className="flex-1" onClick={() => inputRef.current?.click()}>
-            <ImagePlus />
-            Adicionar folhas
+          <Button className="flex-1" onClick={() => inputRef.current?.click()} disabled={importing}>
+            {importing ? <LoaderCircle className="animate-spin" /> : <ImagePlus />}
+            {importing ? "Abrindo PDF..." : "Adicionar folhas"}
           </Button>
-          <Button variant="ghost" onClick={slicer.clearAll} disabled={images.length === 0}>
+          <Button variant="ghost" onClick={slicer.clearAll} disabled={images.length === 0 || importing}>
             Limpar
           </Button>
         </div>
         <div className="mt-1.5">
           <HelpButton topic="etapa-fatiar" variant="etapa" />
         </div>
+        <p className="mt-1.5 text-[10px] leading-relaxed text-muted-foreground">
+          Aceita PDF, PNG e JPG. Cada página do PDF entra como uma folha.
+        </p>
       </div>
 
       {images.length > 0 && (
@@ -212,7 +216,10 @@ export function SlicerPanel({ slicer }: { slicer: Slicer }) {
             aria-label="Preencher bordas automaticamente"
           />
         </div>
-        {config.cornerFill && (
+        <DisabledConfig
+          disabled={!config.cornerFill}
+          reason="Não é possível editar raio e largura porque “Preencher bordas automaticamente” está desligado."
+        >
           <div className="space-y-3">
             <SlicerSliderField
               label="Raio dos cantos (%)"
@@ -220,6 +227,7 @@ export function SlicerPanel({ slicer }: { slicer: Slicer }) {
               step={0.1}
               min={0.1}
               max={30}
+              disabled={!config.cornerFill}
               onChange={(cornerFillCornerPercent) =>
                 slicer.setConfig({ cornerFillCornerPercent })
               }
@@ -230,11 +238,12 @@ export function SlicerPanel({ slicer }: { slicer: Slicer }) {
               step={0.1}
               min={0}
               max={10}
+              disabled={!config.cornerFill}
               onChange={(cornerFillEdgePercent) => slicer.setConfig({ cornerFillEdgePercent })}
             />
             <HelpButton topic="fatiar-cantos" label="entenda o preenchimento das bordas" />
           </div>
-        )}
+        </DisabledConfig>
       </div>
 
       {active && (
@@ -259,6 +268,58 @@ export function SlicerPanel({ slicer }: { slicer: Slicer }) {
         </p>
       )}
 
+      <div className="space-y-3 border-t border-border pt-4">
+        <div className="flex items-center gap-2">
+          <h3 className="section-label">Formato das imagens</h3>
+          <HelpButton topic="fatiar-exportacao" />
+        </div>
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Formato das imagens exportadas">
+          {([[
+            "png",
+            "PNG",
+          ], [
+            "jpeg",
+            "JPG",
+          ]] as const).map(([value, label]) => (
+            <Button
+              key={value}
+              type="button"
+              variant={config.outputFormat === value ? "default" : "outline"}
+              className="h-9"
+              aria-pressed={config.outputFormat === value}
+              onClick={() => slicer.setConfig({ outputFormat: value })}
+            >
+              <FileImage className="size-4" />
+              {label}
+            </Button>
+          ))}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <Gauge className="size-3.5" />
+            Qualidade (DPI)
+          </div>
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Qualidade em DPI">
+            {([150, 300, 600] as const).map((dpi) => (
+              <Button
+                key={dpi}
+                type="button"
+                variant={config.outputDpi === dpi ? "default" : "outline"}
+                className="h-9 px-2 text-xs"
+                aria-pressed={config.outputDpi === dpi}
+                onClick={() => slicer.setConfig({ outputDpi: dpi })}
+              >
+                {dpi} DPI
+              </Button>
+            ))}
+          </div>
+          <p className="text-[10px] leading-relaxed text-muted-foreground">
+            300 DPI mantém os pixels atuais. 150 reduz pela metade e 600 dobra a resolução.
+          </p>
+        </div>
+      </div>
+
       <Button
         className="w-full"
         onClick={() => void slicer.sliceAndDownload()}
@@ -267,7 +328,7 @@ export function SlicerPanel({ slicer }: { slicer: Slicer }) {
         <Package />
         {progress
           ? `Recortando ${progress.done}/${progress.total}...`
-          : `Cortar e baixar zip (${total} carta${total === 1 ? "" : "s"})`}
+          : `Cortar e baixar ${config.outputFormat === "png" ? "PNG" : "JPG"} (${total} carta${total === 1 ? "" : "s"})`}
       </Button>
     </div>
   );

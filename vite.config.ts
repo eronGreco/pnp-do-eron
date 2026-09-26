@@ -63,7 +63,13 @@ export default defineConfig({
     }),
   ],
   optimizeDeps: {
-    include: ["react", "react-dom", "react-dom/client", "@radix-ui/react-accordion"],
+    include: [
+      "react",
+      "react-dom",
+      "react-dom/client",
+      "@radix-ui/react-accordion",
+      "@radix-ui/react-collapsible",
+    ],
   },
   resolve: {
     dedupe: ["react", "react-dom"],

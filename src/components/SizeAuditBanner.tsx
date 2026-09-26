@@ -36,7 +36,7 @@ export function SizeAuditBanner({ audit }: { audit: SizeAudit }) {
     <div className="space-y-1 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive-foreground">
       <div className="flex items-center gap-2 font-medium">
         <AlertTriangle className="h-4 w-4 shrink-0" />
-        <span>O corte não sairia no tamanho pedido. Ajuste antes de montar as folhas.</span>
+        <span>O corte pode sair errado. Você pode ajustar ou continuar e confirmar o download.</span>
       </div>
       <ul className="space-y-0.5 pl-6">
         {errors.slice(0, 6).map((issue, index) => (

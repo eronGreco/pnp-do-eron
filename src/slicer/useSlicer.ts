@@ -13,6 +13,7 @@ export function useSlicer(addLog: (message: string, kind?: "info" | "warn" | "er
     normalizeSliceConfig(loadPreferences().sliceConfig),
   );
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const importing = progress?.total === 0;
 
   const setConfig = useCallback((patch: Partial<SliceConfig>) => {
     setConfigState((current) => {
@@ -35,12 +36,18 @@ export function useSlicer(addLog: (message: string, kind?: "info" | "warn" | "er
 
   const addFiles = useCallback(
     async (files: File[]) => {
-      const { images: loaded, rejected } = await loadSliceImages(files);
-      for (const message of rejected) addLog(message, "warn");
-      if (loaded.length === 0) return;
-      setImages((current) => [...current, ...loaded]);
-      setActiveId((current) => current ?? loaded[0]!.id);
-      addLog(`${loaded.length} folha(s) carregada(s) para fatiar.`);
+      setProgress({ done: 0, total: 0 });
+      try {
+        const { images: loaded, rejected } = await loadSliceImages(files);
+        for (const message of rejected) addLog(message, "warn");
+        const firstLoaded = loaded[0];
+        if (!firstLoaded) return;
+        setImages((current) => [...current, ...loaded]);
+        setActiveId((current) => current ?? firstLoaded.id);
+        addLog(`${loaded.length} folha(s) carregada(s) para fatiar.`);
+      } finally {
+        setProgress(null);
+      }
     },
     [addLog],
   );
@@ -69,7 +76,7 @@ export function useSlicer(addLog: (message: string, kind?: "info" | "warn" | "er
       const zip = await sliceToZip(images, config, (done, total) => setProgress({ done, total }));
       downloadBlob(zip, "cartas-recortadas.zip");
       addLog(
-        `${images.length * config.columns * config.rows} carta(s) recortada(s) e baixadas em zip.`,
+        `${images.length * config.columns * config.rows} carta(s) exportada(s) em ${config.outputFormat === "png" ? "PNG" : "JPG"}, ${config.outputDpi} DPI.`,
       );
     } catch {
       addLog("Não consegui recortar estas folhas. Tente com imagens menores.", "error");
@@ -87,6 +94,7 @@ export function useSlicer(addLog: (message: string, kind?: "info" | "warn" | "er
     setConfig,
     rects,
     progress,
+    importing,
     addFiles,
     removeImage,
     clearAll,

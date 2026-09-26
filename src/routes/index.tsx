@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ClientOnly } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useCameo } from "@/cameo/useCameo";
@@ -48,11 +47,13 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  return (
-    <ClientOnly fallback={<Loading />}>
-      <Studio />
-    </ClientOnly>
-  );
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    setReady(true);
+  }, []);
+
+  return ready ? <Studio /> : <Loading />;
 }
 
 function Loading() {
@@ -75,7 +76,7 @@ function Studio() {
   const update = useAppUpdate();
 
   // Mudou acabamento ou marcas: a prévia da montagem aparece na hora.
-  const marksKey = `${composer.config.finishMode}|${composer.config.assemblyMode}|${composer.config.gutterfoldGapMm}|${JSON.stringify(composer.config.manualMarks)}`;
+  const marksKey = `${composer.config.finishMode}|${composer.config.assemblyMode}|${composer.config.gutterfoldLayout}|${composer.config.gutterfoldDirection}|${composer.config.gutterfoldGapMm}|${composer.config.cameoRegistrationSide}|${JSON.stringify(composer.config.manualMarks)}`;
   const firstMarksKey = useRef(marksKey);
   useEffect(() => {
     if (marksKey === firstMarksKey.current) return;
@@ -158,7 +159,7 @@ function Studio() {
               composer.config.finishMode === "cameo" &&
               Boolean(sheet) &&
               selectedCards.length > 0 &&
-              workspace.side === "front" &&
+              workspace.side === (sheet?.registrationSide ?? "front") &&
               !showingLayout
             }
             installHint={cameo.installHint}

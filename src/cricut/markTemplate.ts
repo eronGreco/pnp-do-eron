@@ -97,6 +97,8 @@ export function cricutTemplateStamp(
     page: [rounded(page.widthMm), rounded(page.heightMm)],
     card: [rounded(config.cardWidthMm), rounded(config.cardHeightMm)],
     assemblyMode: config.assemblyMode,
+    gutterfoldLayout: config.gutterfoldLayout,
+    gutterfoldDirection: config.gutterfoldDirection,
     gutterfoldGapMm: rounded(config.gutterfoldGapMm),
     radiusMm: rounded(radiusMm),
     sheets: layouts.map((layout) =>

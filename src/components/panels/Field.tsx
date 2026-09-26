@@ -89,6 +89,7 @@ export function Field({
   step = 0.5,
   min = 0,
   max,
+  disabled = false,
   onChange,
 }: {
   label: string;
@@ -96,10 +97,11 @@ export function Field({
   step?: number;
   min?: number;
   max?: number;
+  disabled?: boolean;
   onChange: (value: number) => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1">
+    <div className={`flex min-w-0 flex-col gap-1 ${disabled ? "opacity-45" : ""}`} aria-disabled={disabled || undefined}>
       <Label
         title={label}
         className="block truncate text-[11px] leading-4 text-muted-foreground"
@@ -111,6 +113,7 @@ export function Field({
         step={step}
         min={min}
         max={max}
+        disabled={disabled}
         ariaLabel={label}
         onChange={onChange}
       />

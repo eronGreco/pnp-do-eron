@@ -7,6 +7,7 @@ type Props = {
   min: number;
   max: number;
   step?: number;
+  disabled?: boolean;
   onChange: (value: number) => void;
 };
 
@@ -16,10 +17,11 @@ export function SlicerSliderField({
   min,
   max,
   step = 1,
+  disabled = false,
   onChange,
 }: Props) {
   return (
-    <div className="flex min-w-0 flex-col gap-1">
+    <div className={`flex min-w-0 flex-col gap-1 ${disabled ? "opacity-45" : ""}`} aria-disabled={disabled || undefined}>
       <Label
         title={label}
         className="block truncate text-[11px] leading-4 text-muted-foreground"
@@ -31,6 +33,7 @@ export function SlicerSliderField({
         step={step}
         min={min}
         max={max}
+        disabled={disabled}
         ariaLabel={label}
         onChange={onChange}
       />
