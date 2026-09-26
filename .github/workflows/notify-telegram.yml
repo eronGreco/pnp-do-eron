@@ -1,0 +1,56 @@
+name: Notify Telegram
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/MAINTAINER_SYNC.md'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+      COMPARE_URL: ${{ github.event.compare }}
+      ACTOR: ${{ github.actor }}
+      REPOSITORY: ${{ github.repository }}
+
+    steps:
+      - name: Check Telegram configuration
+        if: env.TELEGRAM_BOT_TOKEN == '' || env.TELEGRAM_CHAT_ID == ''
+        run: echo "Telegram notification skipped because repository secrets are not configured yet."
+
+      - name: Send update to Telegram
+        if: env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != ''
+        shell: bash
+        run: |
+          TITLE="${COMMIT_MESSAGE%%$'\n'*}"
+
+          MESSAGE=$(cat <<EOF
+          🆕 Nova atualização no PNP do Eron
+
+          📦 ${TITLE}
+          👤 Atualizado por: ${ACTOR}
+
+          🔎 Ver alterações:
+          ${COMPARE_URL}
+
+          📋 Changelog:
+          https://github.com/${REPOSITORY}/blob/main/CHANGELOG.md
+
+          🌐 Acessar o PNP do Eron:
+          https://pnp.eron.dev.br/
+          EOF
+          )
+
+          curl --fail --silent --show-error --retry 3 \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "disable_web_page_preview=true" \
+            --data-urlencode "text=${MESSAGE}"
