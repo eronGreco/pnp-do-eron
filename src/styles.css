@@ -1,0 +1,161 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * PNP -> Cameo design system.
+ * Console tecnico escuro: grafite com destaque ambar.
+ * Todas as cores sao tokens semanticos em oklch.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-panel: var(--panel);
+  --color-panel-foreground: var(--panel-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.375rem;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.92 0.004 80);
+  --card: oklch(0.205 0.003 80);
+  --card-foreground: oklch(0.92 0.004 80);
+  --panel: oklch(0.205 0.003 80);
+  --panel-foreground: oklch(0.9 0.004 80);
+  --popover: oklch(0.205 0.003 80);
+  --popover-foreground: oklch(0.92 0.004 80);
+  --primary: oklch(0.769 0.166 70);
+  --primary-foreground: oklch(0.16 0.03 70);
+  --secondary: oklch(0.28 0.006 80);
+  --secondary-foreground: oklch(0.92 0.004 80);
+  --muted: oklch(0.25 0.005 80);
+  --muted-foreground: oklch(0.64 0.008 80);
+  --accent: oklch(0.31 0.008 80);
+  --accent-foreground: oklch(0.94 0.004 80);
+  --destructive: oklch(0.62 0.2 22);
+  --destructive-foreground: oklch(0.97 0.01 22);
+  --warning: oklch(0.8 0.15 78);
+  --warning-foreground: oklch(0.2 0.04 78);
+  --success: oklch(0.72 0.16 152);
+  --success-foreground: oklch(0.18 0.03 152);
+  --border: oklch(0.28 0.006 80);
+  --input: oklch(0.31 0.008 80);
+  --ring: oklch(0.769 0.166 70);
+  --sidebar: oklch(0.205 0.003 80);
+  --sidebar-foreground: oklch(0.9 0.004 80);
+  --sidebar-primary: oklch(0.769 0.166 70);
+  --sidebar-primary-foreground: oklch(0.16 0.03 70);
+  --sidebar-accent: oklch(0.28 0.006 80);
+  --sidebar-accent-foreground: oklch(0.92 0.004 80);
+  --sidebar-border: oklch(0.28 0.006 80);
+  --sidebar-ring: oklch(0.769 0.166 70);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-background);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-accent);
+  }
+
+  /* Esconde as setinhas nativas dos campos numéricos para combinar com o visual do sistema */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+}
+
+@utility panel-surface {
+  background-color: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+/* Grade pontilhada de fundo da area de previa. */
+@utility workbench-grid {
+  background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Rotulo curto de secao na barra lateral. */
+@utility section-label {
+  font-family: var(--font-display);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
