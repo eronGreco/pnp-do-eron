@@ -7,7 +7,7 @@ import {
   paperAllowed,
 } from "@/composer/paperSizes";
 import { registrationSpacingMm, registrationTb123 } from "@/cut/geometry";
-import { cutWidthFor, layoutSheets } from "@/composer/layoutSheets";
+import { backRect, cutWidthFor, gridFor, layoutSheets, resolvedGutterfoldDirection } from "@/composer/layoutSheets";
 import { markCoverage } from "@/composer/markCoverage";
 import { DEFAULT_COMPOSER_CONFIG, type ComposerCard, type ComposerConfig } from "@/composer/types";
 import { cutExportFiles, exportSheetsFrom, toDxf, toSvg } from "@/export/cutVectors";
@@ -95,6 +95,19 @@ describe("marcas do sensor", () => {
   it("na guilhotina não existe faixa branca para avisar", () => {
     expect(markCoverage(cards(9), { ...base, finishMode: "manual" }).content).toHaveLength(0);
   });
+
+  it("mantém as marcas da Cameo na frente por padrão", () => {
+    expect(DEFAULT_COMPOSER_CONFIG.cameoRegistrationSide).toBe("front");
+  });
+
+  it("espelha a geometria do corte quando as marcas ficam no verso", () => {
+    const config: ComposerConfig = { ...base, cameoRegistrationSide: "back" };
+    const placed = layoutSheets(cards(1), config)[0]!.placements[0]!;
+    expect(backRect(placed.cutRectMm, config).x0).toBeCloseTo(
+      pageSizeMm(config).widthMm - placed.cutRectMm.x1,
+      6,
+    );
+  });
 });
 
 describe("exportar linhas de corte", () => {
@@ -157,5 +170,161 @@ describe("exportar linhas de corte", () => {
     const svg = toSvg(sheets[0]!, 3);
     expect((svg.match(/<path /g) ?? []).length).toBe(1);
     expect(svg).not.toContain("fold");
+  });
+});
+
+describe("gutterfold de folha inteira", () => {
+  const whole: ComposerConfig = {
+    ...base,
+    finishMode: "manual",
+    assemblyMode: "gutterfold",
+    gutterfoldLayout: "sheet",
+    gutterfoldDirection: "horizontal",
+    paperSize: "a4",
+    orientation: "paisagem",
+    cardWidthMm: 52,
+    cardHeightMm: 52,
+    bleedMm: 0,
+    gapMm: 0,
+    gutterfoldGapMm: 0,
+  };
+
+  it("espelha cada verso na metade oposta e o gira na dobra horizontal", () => {
+    const layout = layoutSheets(cards(4), whole)[0]!;
+    expect(layout.sheetFoldDirection).toBe("horizontal");
+    expect(layout.sheetFoldRectMm?.y0).toBeCloseTo(105, 6);
+    for (const placed of layout.placements) {
+      expect(placed.backRectMm?.x0).toBeCloseTo(placed.frontRectMm!.x0, 6);
+      expect(placed.backRectMm?.y0).toBeCloseTo(210 - placed.frontRectMm!.y1, 6);
+      expect(placed.backRotationDeg).toBe(180);
+      expect(placed.cutRectMm.x1 - placed.cutRectMm.x0).toBeCloseTo(52, 6);
+      expect(placed.cutRectMm.y1 - placed.cutRectMm.y0).toBeCloseTo(52, 6);
+    }
+  });
+
+  it("encosta frente e verso na dobra quando a canaleta é zero", () => {
+    const config = { ...whole, cardWidthMm: 63.5, cardHeightMm: 88 };
+    const layout = layoutSheets(cards(4), config)[0]!;
+    expect(layout.placements).toHaveLength(4);
+    for (const placed of layout.placements) {
+      expect(placed.frontRectMm?.y1).toBeCloseTo(105, 6);
+      expect(placed.backRectMm?.y0).toBeCloseTo(105, 6);
+    }
+  });
+
+  it("usa somente a canaleta como distância entre frente e verso", () => {
+    const config = { ...whole, cardWidthMm: 63.5, cardHeightMm: 88, gutterfoldGapMm: 4 };
+    const placed = layoutSheets(cards(1), config)[0]?.placements[0];
+    expect(placed?.frontRectMm?.y1).toBeCloseTo(103, 6);
+    expect(placed?.backRectMm?.y0).toBeCloseTo(107, 6);
+    expect((placed?.backRectMm?.y0 ?? 0) - (placed?.frontRectMm?.y1 ?? 0)).toBeCloseTo(4, 6);
+  });
+
+  it("isola a sangria de cada face mesmo com canaleta e espaço zerados", () => {
+    const config: ComposerConfig = {
+      ...whole,
+      cardWidthMm: 63.5,
+      cardHeightMm: 88,
+      bleedMm: 3,
+      bleedMode: "completa",
+      backBleed: { ...whole.backBleed, enabled: true },
+      backExtraBleedMm: 18,
+    };
+    const layout = layoutSheets(cards(4), config)[0]!;
+    const interiorOverlap = (a: { x0: number; y0: number; x1: number; y1: number }, b: { x0: number; y0: number; x1: number; y1: number }) =>
+      Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > 1e-7 &&
+      Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) > 1e-7;
+    const clips = layout.placements.flatMap((placed) => [placed.clipRectMm, placed.backClipRectMm!]);
+
+    for (let first = 0; first < clips.length; first += 1) {
+      for (let second = first + 1; second < clips.length; second += 1) {
+        expect(interiorOverlap(clips[first]!, clips[second]!)).toBe(false);
+      }
+    }
+  });
+
+  it("aproveita quatro cartas MTG na A4 deitada com marcas Cameo", () => {
+    const config = {
+      ...whole,
+      finishMode: "cameo" as const,
+      cardWidthMm: 63.5,
+      cardHeightMm: 88,
+      bleedMode: "colada" as const,
+    };
+    const grid = gridFor(config);
+    const layout = layoutSheets(cards(4), config)[0]!;
+    expect(grid.perSheet).toBe(4);
+    expect(layout.placements).toHaveLength(4);
+  });
+
+  it("espelha os versos lateralmente na dobra vertical", () => {
+    const config = { ...whole, gutterfoldDirection: "vertical" as const };
+    const placed = layoutSheets(cards(1), config)[0]!.placements[0]!;
+    expect(placed.backRectMm?.x0).toBeCloseTo(297 - placed.frontRectMm!.x1, 6);
+    expect(placed.backRectMm?.y0).toBeCloseTo(placed.frontRectMm!.y0, 6);
+    expect(placed.backRotationDeg).toBe(0);
+    expect(placed.frontRectMm?.x1).toBeCloseTo(148.5, 6);
+    expect(placed.backRectMm?.x0).toBeCloseTo(148.5, 6);
+  });
+
+  it("automática escolhe a direção com maior rendimento", () => {
+    const auto = { ...whole, gutterfoldDirection: "auto" as const, cardWidthMm: 63.5, cardHeightMm: 88 };
+    const horizontal = layoutSheets(cards(30), { ...auto, gutterfoldDirection: "horizontal" }).length;
+    const vertical = layoutSheets(cards(30), { ...auto, gutterfoldDirection: "vertical" }).length;
+    const chosen = resolvedGutterfoldDirection(auto);
+    expect(chosen).toBe(horizontal <= vertical ? "horizontal" : "vertical");
+  });
+
+  it("DXF e SVG levam uma linha de corte por carta, nunca a dobra", () => {
+    const layout = layoutSheets(cards(4), whole)[0]!;
+    const sheets = exportSheetsFrom([layout], pageSizeMm(whole));
+    expect(sheets[0]!.rects).toHaveLength(4);
+    expect(toSvg(sheets[0]!, 3)).not.toContain("dobra");
+  });
+
+  it.each(["manual", "cameo", "cricut"] as const)(
+    "ativa a folha inteira no acabamento %s",
+    (finishMode) => {
+      const config = { ...whole, finishMode };
+      const layout = layoutSheets(cards(1), config)[0]!;
+      const placed = layout.placements[0]!;
+      expect(cutWidthFor(config)).toBeCloseTo(config.cardWidthMm, 6);
+      expect(layout.sheetFoldRectMm).toBeDefined();
+      expect(placed.frontRectMm?.y1).toBeLessThanOrEqual(105);
+      expect(placed.backRectMm?.y0).toBeGreaterThanOrEqual(105);
+      expect(placed.backRotationDeg).toBe(180);
+    },
+  );
+});
+
+describe("organização guiada", () => {
+  it("começa segura, sem distância adicional e com canaleta zero", () => {
+    expect(DEFAULT_COMPOSER_CONFIG.packingPolicy).toBe("seguro");
+    expect(DEFAULT_COMPOSER_CONFIG.bleedMode).toBe("completa");
+    expect(DEFAULT_COMPOSER_CONFIG.gapMm).toBe(0);
+    expect(DEFAULT_COMPOSER_CONFIG.gutterfoldGapMm).toBe(0);
+  });
+});
+
+describe("gutterfold carta por carta", () => {
+  it("não deixa a sangria do verso atravessar a frente nem outra peça", () => {
+    const config: ComposerConfig = {
+      ...base,
+      finishMode: "manual",
+      assemblyMode: "gutterfold",
+      gutterfoldLayout: "piece",
+      cardWidthMm: 52,
+      cardHeightMm: 52,
+      bleedMm: 6,
+      gapMm: 0,
+      gutterfoldGapMm: 0,
+      backBleed: { ...base.backBleed, enabled: true },
+      backExtraBleedMm: 20,
+    };
+    const layout = layoutSheets(cards(4), config)[0]!;
+
+    for (const placed of layout.placements) {
+      expect(placed.clipRectMm.x1).toBeLessThanOrEqual(placed.backClipRectMm!.x0);
+    }
   });
 });

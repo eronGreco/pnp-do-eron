@@ -32,6 +32,7 @@ import { SheetPanel } from "@/components/panels/SheetPanel";
 import { SizePanel } from "@/components/panels/SizePanel";
 import { BleedPanel } from "@/components/panels/BleedPanel";
 import { BLEED_METHOD_LABEL } from "@/bleed/types";
+import { PACKING_LABEL } from "@/composer/packingPolicy";
 import { Button } from "@/components/ui/button";
 import { NumberStepper } from "@/components/panels/Field";
 import { HelpButton } from "@/components/HelpButton";
@@ -85,6 +86,7 @@ export function StudioSidebar({
   const manual = config.finishMode === "manual";
   const cricut = config.finishMode === "cricut";
   const gutterfold = config.assemblyMode === "gutterfold";
+  const wholeSheet = gutterfold && config.gutterfoldLayout === "sheet";
   const auditAlert = cards.length > 0 && !composer.sizeAudit.ok;
   const bleedSummary = config.bleed.enabled
     ? `${fmt(config.bleedMm)} mm · ${BLEED_METHOD_LABEL[config.bleed.method]}`
@@ -107,14 +109,14 @@ export function StudioSidebar({
       icon: <Scissors className="size-4" />,
       summary: cricut
         ? gutterfold
-          ? "Cricut · gutterfold"
+          ? wholeSheet ? "Cricut · dobra da folha" : "Cricut · gutterfold"
           : "Cricut · Design Space"
         : manual
           ? gutterfold
-            ? "Guilhotina · gutterfold"
+            ? wholeSheet ? "Guilhotina · dobra da folha" : "Guilhotina · gutterfold"
             : "Guilhotina · corte na mão"
           : gutterfold
-            ? "Silhouette Cameo · gutterfold"
+            ? wholeSheet ? "Silhouette Cameo · dobra da folha" : "Silhouette Cameo · gutterfold"
             : "Silhouette Cameo · corte automático",
     },
     {
@@ -138,13 +140,15 @@ export function StudioSidebar({
       id: "sangria",
       label: "4. Sangria",
       icon: <Sparkles className="size-4" />,
-      summary: gutterfold ? `${bleedSummary}${backBleedSummary} · não atravessa a dobra` : `${bleedSummary}${backBleedSummary}`,
+      summary: gutterfold
+        ? `${PACKING_LABEL[config.packingPolicy]} · ${bleedSummary}${backBleedSummary} · não atravessa a dobra`
+        : `${PACKING_LABEL[config.packingPolicy]} · ${bleedSummary}${backBleedSummary}`,
     },
     {
       id: "folha",
       label: "5. Folha e marcas",
       icon: <LayoutPanelTop className="size-4" />,
-      summary: `${config.paperSize.toUpperCase()} ${config.orientation} · ${grid.columns} × ${grid.rows} ${gutterfold ? "peças" : "cartas"}`,
+       summary: `${config.paperSize.toUpperCase()} ${config.orientation} · ${grid.columns} × ${grid.rows} ${gutterfold && !wholeSheet ? "peças" : "cartas"}`,
     },
     {
       id: "montar",

@@ -1,4 +1,4 @@
-import { Scan, Scissors, Shapes } from "lucide-react";
+import { BookOpen, LayoutGrid, Scan, Scissors, Shapes } from "lucide-react";
 import type { Composer } from "@/composer/useComposer";
 import type { AssemblyMode } from "@/composer/types";
 import { Button } from "@/components/ui/button";
@@ -79,6 +79,27 @@ export function FinishPanel({ composer }: { composer: Composer }) {
           help="modo-gutterfold"
           onClick={() => setAssembly(composer, "gutterfold")}
         />
+        {config.assemblyMode === "gutterfold" && (
+          <div className="ml-2 space-y-2 border-l border-border pl-3">
+            <p className="text-[10px] font-bold uppercase text-muted-foreground">Formato da dobra</p>
+            <ModeCard
+              active={config.gutterfoldLayout === "piece"}
+              icon={<LayoutGrid className="size-4" />}
+              title="Carta por carta"
+              hint="Cada carta vira uma peça aberta com frente e verso."
+              help="modo-gutterfold"
+              onClick={() => composer.setConfig({ ...config, gutterfoldLayout: "piece" })}
+            />
+            <ModeCard
+              active={config.gutterfoldLayout === "sheet"}
+              icon={<BookOpen className="size-4" />}
+              title="Dobrar a folha inteira"
+              hint="Frentes em uma metade, versos invertidos na outra e uma dobra central."
+              help="modo-gutterfold-folha"
+              onClick={() => composer.setConfig({ ...config, gutterfoldLayout: "sheet" })}
+            />
+          </div>
+        )}
       </section>
     </div>
   );
@@ -95,6 +116,7 @@ function ModeCard({
   hint,
   help,
   onClick,
+  disabled = false,
 }: {
   active: boolean;
   icon: React.ReactNode;
@@ -102,6 +124,7 @@ function ModeCard({
   hint: string;
   help: HelpTopicId;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="space-y-1.5">
@@ -109,6 +132,7 @@ function ModeCard({
         variant={active ? "default" : "outline"}
         className="h-auto w-full flex-col items-start gap-1 whitespace-normal py-3 text-left"
         onClick={onClick}
+        disabled={disabled}
         aria-pressed={active}
       >
         <span className="flex items-center gap-1.5 text-sm font-semibold">

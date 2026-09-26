@@ -1,4 +1,5 @@
 import type { Composer } from "@/composer/useComposer";
+import type { CameoRegistrationSide } from "@/composer/types";
 import {
   MANUAL_MARK_HINTS,
   MANUAL_MARK_LABELS,
@@ -8,6 +9,7 @@ import {
 } from "@/cut/manualMarks";
 import { Field } from "@/components/panels/Field";
 import { HelpButton } from "@/components/HelpButton";
+import { DisabledConfig } from "@/components/panels/DisabledConfig";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -73,6 +75,7 @@ export function MarksPanel({ composer }: { composer: Composer }) {
   const { config } = composer;
   const manual = config.manualMarks;
   const isManual = config.finishMode === "manual";
+  const isCameo = config.finishMode === "cameo";
   const gutterfold = config.assemblyMode === "gutterfold";
 
   const setManual = (patch: Partial<typeof manual>) =>
@@ -101,11 +104,10 @@ export function MarksPanel({ composer }: { composer: Composer }) {
                 ? "Frente e verso ficam na mesma página, então as marcas manuais saem nessa página única."
                 : "As páginas ímpares são a frente das cartas e as pares são o verso."}
             </p>
-            {gutterfold ? (
-              <div className="rounded-md border border-border bg-background/50 p-2 text-[11px] text-muted-foreground">
-                A canaleta central é só uma guia de dobra. Ela não entra nas marcas nem no arquivo de corte.
-              </div>
-            ) : (
+            <DisabledConfig
+              disabled={gutterfold}
+              reason="Não é possível escolher páginas porque, no gutterfold, frente e verso ficam na mesma página."
+            >
               <div className="grid grid-cols-3 gap-2">
                 {SIDES.map((side) => {
                   const active = manual.sides === side.id;
@@ -113,6 +115,7 @@ export function MarksPanel({ composer }: { composer: Composer }) {
                     <button
                       key={side.id}
                       type="button"
+                      disabled={gutterfold}
                       onClick={() => setManual({ sides: side.id })}
                       aria-pressed={active}
                       className={`flex flex-col items-center gap-1.5 rounded-md border p-2 transition-colors ${
@@ -127,7 +130,7 @@ export function MarksPanel({ composer }: { composer: Composer }) {
                   );
                 })}
               </div>
-            )}
+            </DisabledConfig>
           </div>
 
           <div className="space-y-2">
@@ -164,7 +167,10 @@ export function MarksPanel({ composer }: { composer: Composer }) {
             </div>
           </div>
 
-          {manual.types.includes("cruzes") && (
+          <DisabledConfig
+            disabled={!manual.types.includes("cruzes")}
+            reason="Não é possível editar esta opção porque a marca Cruzes está desligada."
+          >
             <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
               <div>
                 <Label className="text-xs">Cruzes até as bordas</Label>
@@ -174,28 +180,48 @@ export function MarksPanel({ composer }: { composer: Composer }) {
               </div>
               <Switch
                 checked={manual.crossToEdges}
+                disabled={!manual.types.includes("cruzes")}
                 onCheckedChange={(checked) => setManual({ crossToEdges: checked })}
               />
             </div>
-          )}
+          </DisabledConfig>
+
+          <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+            <div className="min-w-0">
+              <Label className="text-xs">Imprimir o contorno arredondado</Label>
+              <HelpButton topic="contorno-impresso" label="entenda o contorno impresso" />
+            </div>
+            <Switch
+              checked={manual.printRoundedOutline}
+              onCheckedChange={(checked) => setManual({ printRoundedOutline: checked })}
+              aria-label="Imprimir o contorno arredondado"
+            />
+          </div>
 
           <HelpButton topic="marcas-medidas" label="entenda espessura, comprimento e distância" />
 
+          <DisabledConfig
+            disabled={manual.types.length === 0}
+            reason="Não é possível editar as medidas porque nenhuma marca impressa está selecionada."
+          >
           <div className="grid grid-cols-2 gap-3">
             <Field
               label="Espessura (mm)"
               step={0.05}
               value={manual.thicknessMm}
+              disabled={manual.types.length === 0}
               onChange={(value) => setManual({ thicknessMm: value })}
             />
             <Field
               label="Comprimento (mm)"
               value={manual.lengthMm}
+              disabled={manual.types.length === 0}
               onChange={(value) => setManual({ lengthMm: value })}
             />
             <Field
               label="Distância da carta (mm)"
               value={manual.offsetMm}
+              disabled={manual.types.length === 0}
               onChange={(value) => setManual({ offsetMm: value })}
             />
             <div className="space-y-1">
@@ -204,6 +230,7 @@ export function MarksPanel({ composer }: { composer: Composer }) {
                 <HelpButton topic="marcas-cor" />
               </div>
               <Select
+                disabled={manual.types.length === 0}
                 value={manual.color}
                 onValueChange={(value) => setManual({ color: value as ManualMarkColor })}
               >
@@ -220,10 +247,54 @@ export function MarksPanel({ composer }: { composer: Composer }) {
               </Select>
             </div>
           </div>
+          </DisabledConfig>
 
         </>
       ) : (
         <>
+          {isCameo && !gutterfold && (
+            <DisabledConfig
+              disabled={gutterfold}
+              reason="Não é possível escolher o lado porque, no gutterfold, as marcas ficam na página única."
+            >
+            <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-bold text-foreground">
+                  Em qual lado imprimir as marcas
+                </Label>
+                <HelpButton topic="marcas-silhouette-onde" />
+              </div>
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                Este será o lado virado para cima quando a folha for carregada na Silhouette.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {(["front", "back"] as CameoRegistrationSide[]).map((side) => {
+                  const active = config.cameoRegistrationSide === side;
+                  const manualSide: ManualMarkSides = side === "front" ? "frente" : "verso";
+                  return (
+                    <button
+                      key={side}
+                      type="button"
+                      disabled={gutterfold}
+                      onClick={() => composer.setConfig({ ...config, cameoRegistrationSide: side })}
+                      aria-pressed={active}
+                      className={`flex flex-col items-center gap-1.5 rounded-md border p-2 transition-colors ${
+                        active
+                          ? "border-primary bg-primary/15"
+                          : "border-border bg-background hover:bg-secondary/40"
+                      }`}
+                    >
+                      <SidesGlyph sides={manualSide} active={active} />
+                      <span className="text-[11px] font-medium leading-tight">
+                        {side === "front" ? "Na frente" : "No verso"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            </DisabledConfig>
+          )}
           <Field
             label="Borda branca das marcas (mm)"
             max={10}

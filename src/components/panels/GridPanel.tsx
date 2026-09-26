@@ -1,11 +1,13 @@
 import type { Composer } from "@/composer/useComposer";
 import { Field } from "@/components/panels/Field";
 import { Button } from "@/components/ui/button";
+import { DisabledConfig } from "@/components/panels/DisabledConfig";
 
 export function GridPanel({ composer }: { composer: Composer }) {
   const { config, grid, layouts, cards } = composer;
   const manualGrid = config.gridMode === "manual";
-  const unit = config.assemblyMode === "gutterfold" ? "peça(s)" : "carta(s)";
+  const wholeSheet = config.assemblyMode === "gutterfold" && config.gutterfoldLayout === "sheet";
+  const unit = config.assemblyMode === "gutterfold" && !wholeSheet ? "peça(s)" : "carta(s)";
 
   return (
     <div className="space-y-4">
@@ -30,31 +32,36 @@ export function GridPanel({ composer }: { composer: Composer }) {
             })
           }
         >
-          <span className="text-xs font-semibold">Eu escolho</span>
+          <span className="text-xs font-semibold">Personalizada</span>
           <span className="text-[10px] font-normal opacity-80">
-            {config.assemblyMode === "gutterfold" ? "Peças por linha e coluna" : "Cartas por linha e coluna"}
+             {config.assemblyMode === "gutterfold" && !wholeSheet ? "Peças por linha e coluna" : "Cartas por linha e coluna"}
           </span>
         </Button>
       </div>
 
-      {manualGrid && (
+      <DisabledConfig
+        disabled={!manualGrid}
+        reason="Não é possível editar linhas e colunas porque a grade Automática está ativa."
+      >
         <div className="grid grid-cols-2 gap-3">
           <Field
-            label={config.assemblyMode === "gutterfold" ? "Peças por linha" : "Cartas por linha"}
+            label={config.assemblyMode === "gutterfold" && !wholeSheet ? "Peças por linha" : "Cartas por linha"}
             value={config.gridColumns}
             min={1}
             step={1}
+            disabled={!manualGrid}
             onChange={(value) => composer.setConfig({ ...config, gridColumns: Math.round(value) })}
           />
           <Field
-            label={config.assemblyMode === "gutterfold" ? "Peças por coluna" : "Cartas por coluna"}
+            label={config.assemblyMode === "gutterfold" && !wholeSheet ? "Peças por coluna" : "Cartas por coluna"}
             value={config.gridRows}
             min={1}
             step={1}
+            disabled={!manualGrid}
             onChange={(value) => composer.setConfig({ ...config, gridRows: Math.round(value) })}
           />
         </div>
-      )}
+      </DisabledConfig>
 
       <div className="space-y-1 rounded-md border border-border p-3 text-[11px] text-muted-foreground">
         <p>

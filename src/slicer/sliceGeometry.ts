@@ -42,6 +42,20 @@ export function normalizeSliceConfig(config: Partial<SliceConfig>): SliceConfig 
           : DEFAULT_SLICE_CONFIG.cornerFillEdgePercent,
       ),
     ),
+    outputFormat: base.outputFormat === "jpeg" ? "jpeg" : "png",
+    outputDpi: base.outputDpi === 150 || base.outputDpi === 600 ? base.outputDpi : 300,
+  };
+}
+
+export function scaledSliceSize(
+  width: number,
+  height: number,
+  dpi: SliceConfig["outputDpi"],
+): { width: number; height: number } {
+  const scale = dpi / 300;
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
   };
 }
 

@@ -61,7 +61,8 @@ export function useComposer(workspace: Workspace) {
     (value) => {
       abortHydration();
       setConfigState((current) => {
-        const next = typeof value === "function" ? value(current) : value;
+        const requested = typeof value === "function" ? value(current) : value;
+        const next = requested;
         if (next.finishMode !== "cameo") return next;
 
         // Na Cameo, folha diferente de A4 deitada vale so com o aviso aceito.
@@ -102,13 +103,17 @@ export function useComposer(workspace: Workspace) {
         if (!stored || stored.cards.length === 0) return;
         setImages(reviveImages(stored.images));
         setCards(stored.cards);
-        setConfigState({
+        const restoredConfig = {
           ...DEFAULT_COMPOSER_CONFIG,
           ...stored.config,
           bleed: { ...DEFAULT_COMPOSER_CONFIG.bleed, ...stored.config.bleed },
           backBleed: { ...DEFAULT_COMPOSER_CONFIG.backBleed, ...(stored.config.backBleed ?? {}) },
           manualMarks: { ...DEFAULT_COMPOSER_CONFIG.manualMarks, ...stored.config.manualMarks },
-        });
+          // Trabalhos antigos continuam exatamente como foram salvos. Como não
+          // tinham política guiada, suas medidas entram como personalizadas.
+          packingPolicy: stored.config.packingPolicy ?? "personalizado",
+        };
+        setConfigState(restoredConfig);
         setCricutMarks(reviveCricutMarksTemplate(stored.cricutMarks));
         setImportModeState(stored.importMode);
         setRestored(true);
@@ -399,7 +404,8 @@ export function useComposer(workspace: Workspace) {
   }, [abortHydration, workspace]);
 
 
-  const build = useCallback(async (download = true) => {
+  const build = useCallback(async (options: { allowRiskyDownload?: boolean } = {}) => {
+    const allowRiskyDownload = options.allowRiskyDownload === true;
     if (cards.length === 0) {
       workspace.addLog("Adicione pelo menos uma imagem de carta.", "warn");
       return;
@@ -412,7 +418,7 @@ export function useComposer(workspace: Workspace) {
         );
         return;
       }
-      if (cricutCoverage.content.length > 0) {
+      if (cricutCoverage.content.length > 0 && !allowRiskyDownload) {
         workspace.addLog(
           "As marcas da Cricut estão cobrindo conteúdo de carta. Ajuste a grade antes de montar.",
           "error",
@@ -445,10 +451,15 @@ export function useComposer(workspace: Workspace) {
       for (const warning of composed.warnings) workspace.addLog(warning, "warn");
       for (const error of composed.errors) workspace.addLog(error, "error");
 
-      if (download && composed.errors.length === 0) {
+      if (composed.errors.length === 0 || allowRiskyDownload) {
         downloadBytes(new Uint8Array(composed.bytes.slice(0)), composed.fileName);
-        workspace.addLog("PDF de impressão salvo no seu computador.", "ok");
-      } else if (download) {
+        workspace.addLog(
+          allowRiskyDownload && composed.errors.length > 0
+            ? "PDF salvo mesmo com os problemas confirmados. Confira o arquivo antes de imprimir ou cortar."
+            : "PDF de impressão salvo no seu computador.",
+          allowRiskyDownload && composed.errors.length > 0 ? "warn" : "ok",
+        );
+      } else {
         workspace.addLog(
           "Montei as folhas, mas não baixei o PDF por causa do erro acima.",
           "warn",

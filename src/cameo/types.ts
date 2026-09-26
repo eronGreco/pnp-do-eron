@@ -29,6 +29,8 @@ export type Sheet = {
   pageHeightMm: number;
   cards: Card[];
   rotated: boolean;
+  /** Lado que contém as marcas do sensor e deve ficar para cima no corte. */
+  registrationSide?: "front" | "back";
 };
 
 export type CutSettings = {

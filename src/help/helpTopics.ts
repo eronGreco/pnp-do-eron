@@ -108,6 +108,18 @@ export const HELP_TOPICS = {
     when: "Funciona com Guilhotina, Silhouette Cameo e Cricut. Em todos os casos o corte é só o contorno externo da peça aberta.",
     warning: "A sangria da frente não atravessa para o verso, e a sangria do verso não invade a frente nem outra peça.",
   },
+  "modo-gutterfold-folha": {
+    title: "Dobrar a folha inteira",
+    lead: "Coloca todas as frentes em uma metade e os versos correspondentes na outra, para dobrar a folha inteira antes do corte.",
+    howTo: [
+      "Escolha Silhouette Cameo, Cricut ou Guilhotina e depois Gutterfold.",
+      "Selecione Dobrar a folha inteira.",
+      "Escolha Automática para aproveitar melhor o papel, ou force a dobra horizontal ou vertical.",
+      "Imprima em 100%, dobre pela linha central e só depois corte as cartas.",
+    ],
+    when: "Use quando o tamanho das cartas permite alinhar várias frentes e versos com uma única dobra, como na montagem 2 por 3 ou 4 por 1.",
+    warning: "Na dobra horizontal, as frentes ficam em cima e os versos embaixo, girados de cabeça para baixo. A linha central é somente dobra, nunca corte.",
+  },
 
   // ---------------------------------------------------------------- etapa 2
   "etapa-cartas": {
@@ -228,12 +240,12 @@ export const HELP_TOPICS = {
   // ---------------------------------------------------------------- etapa 4
   "etapa-sangria": {
     title: "Etapa 4: Sangria",
-    lead: "Aqui ficam três coisas separadas: espaço da frente na folha, criação de faixa nas frentes e criação de faixa só no verso.",
+    lead: "Escolha a margem da frente e como as cartas devem ocupar a folha. O sistema combina os espaços para você.",
     howTo: [
-      "Ajuste a sangria da frente e o modo de encaixe das cartas.",
+      "Escolha Seguro para preservar toda a margem, Econômico para compartilhar a faixa segura ou Cartas coladas para cortar na divisa.",
       "Se a frente veio cortada rente à carta, ligue Criar sangria nas frentes.",
-      "Se só o verso precisa passar da linha de corte, use Sangria só no verso.",
-      "Confira a prévia: frente, verso, grade e linha de corte ficam separados visualmente.",
+      "Ajuste o verso separadamente quando ele precisar de outra margem.",
+      "Abra Ajustes avançados apenas quando precisar controlar métodos ou medidas especiais.",
     ],
     example: "Frente com 0 mm e verso com 2 mm de sangria ajuda quando o verso tem borda sólida e a frente será a referência do corte.",
     warning: "A arte original nunca é alterada. A sangria é criada só na folha montada.",
@@ -250,12 +262,13 @@ export const HELP_TOPICS = {
     avoid: "Sangria muito grande gasta folha e pode tirar uma carta de cada folha.",
   },
   "modo-sangria": {
-    title: "Modo de sangria",
-    lead: "Define como as cartas se acomodam na folha em relação à sangria.",
+    title: "Organização na folha",
+    lead: "Você escolhe o resultado e o sistema combina sangria e distância sem controles concorrentes.",
     howTo: [
-      "Completa: cada carta leva a sangria inteira nos quatro lados. É o mais seguro.",
-      "Compartilhada: cartas vizinhas dividem a mesma faixa, então cabe mais por folha.",
-      "Coladas: as cartas ficam encostadas, o corte cai na divisa e a sangria entre elas é descartada. Cabe o máximo por folha.",
+      "Seguro: cada carta preserva a sangria inteira nos quatro lados.",
+      "Econômico: cartas vizinhas compartilham apenas a faixa segura, então cabe mais por folha.",
+      "Cartas coladas: o corte cai na divisa e a margem entre vizinhas é descartada.",
+      "Personalizado: libera a distância manual nos Ajustes avançados da folha.",
     ],
     when: "Compartilhada e coladas rendem mais folha, o que ajuda em baralhos grandes.",
     warning: "No modo coladas, um corte torto invade a carta vizinha. Use quando você confia no corte.",
@@ -361,10 +374,10 @@ export const HELP_TOPICS = {
   },
   "espaco-cartas": {
     title: "Espaço entre as cartas",
-    lead: "É a folga entre uma carta e a vizinha na folha.",
+    lead: "No modo guiado, o sistema calcula a distância compatível com a organização escolhida.",
     howTo: [
-      "Zero deixa as cartas encostadas, com a sangria dividida.",
-      "Alguns milímetros dão espaço para a lâmina e para as marcas.",
+      "Use Seguro, Econômico ou Cartas coladas para deixar o cálculo automático.",
+      "Escolha Personalizado apenas quando precisar acrescentar uma distância manual.",
     ],
     example: "4 mm de espaço deixam lugar confortável para marcas de canto entre as cartas.",
     avoid: "Espaço grande demais tira cartas da folha.",
@@ -379,6 +392,16 @@ export const HELP_TOPICS = {
     ],
     example: "4 mm costuma dar uma dobra confortável para protótipos colados.",
     warning: "A canaleta não é uma linha de corte. O arquivo de corte exportado e a Cameo recebem apenas o contorno externo.",
+  },
+  "direcao-gutterfold": {
+    title: "Direção da dobra",
+    lead: "Escolhe em qual sentido a folha inteira será dobrada ao meio.",
+    howTo: [
+      "Automática compara horizontal e vertical e usa a direção que comporta mais cartas.",
+      "Horizontal coloca frentes em cima e versos invertidos embaixo, como na imagem de referência.",
+      "Vertical coloca frentes à esquerda e versos espelhados à direita.",
+    ],
+    when: "Troque manualmente quando a posição do papel, a fibra ou o jeito de cortar forem mais importantes que o rendimento.",
   },
   grade: {
     title: "Grade da folha",
@@ -434,6 +457,17 @@ export const HELP_TOPICS = {
       "Frente e verso ajuda a conferir o alinhamento da impressão dos dois lados, e é o que a maioria das pessoas quer quando imprime em frente e verso.",
     ],
     when: "As páginas ímpares do PDF são a frente das cartas e as pares são o verso.",
+  },
+  "marcas-silhouette-onde": {
+    title: "Marcas da Silhouette na frente ou no verso",
+    lead: "Escolhe em qual lado da folha a Silhouette vai ler as marcas antes de cortar.",
+    howTo: [
+      "Na frente é o padrão e mantém o funcionamento atual.",
+      "No verso imprime as marcas junto das artes do verso.",
+      "Ao cortar, carregue na máquina o lado escolhido virado para cima.",
+      "O sistema espelha as posições de corte automaticamente quando as marcas estão no verso.",
+    ],
+    warning: "Monte e baixe novamente o PDF depois de trocar o lado das marcas.",
   },
   "borda-branca-marcas": {
     title: "Borda branca das marcas",
@@ -505,11 +539,12 @@ export const HELP_TOPICS = {
     title: "Fatiar folha",
     lead: "Recorta uma folha cheia de cartas em imagens separadas, uma por carta.",
     howTo: [
-      "Suba as folhas digitalizadas ou baixadas.",
+      "Adicione folhas em PDF, PNG ou JPG. Cada página do PDF entra como uma folha separada.",
       "Ajuste as margens, o número de colunas e linhas e as folgas.",
+      "Escolha PNG ou JPG e a qualidade em DPI.",
       "Baixe o zip com as cartas separadas.",
     ],
-    warning: "Tudo acontece no seu computador, e o zip fica salvo aí mesmo. Nada é enviado para a internet.",
+    warning: "O PDF e as imagens são abertos no seu computador. Nada é enviado para a internet.",
   },
   "fatiar-recorte": {
     title: "Margens, colunas e folgas",
@@ -538,6 +573,16 @@ export const HELP_TOPICS = {
       "A largura das laterais funciona de forma independente do raio.",
     ],
     example: "Raio de 6% e laterais de 1% resolvem a maioria das cartas com canto redondo.",
+  },
+  "fatiar-exportacao": {
+    title: "Formato e qualidade",
+    lead: "Define o tipo e a resolução das imagens de cartas incluídas no arquivo ZIP.",
+    howTo: [
+      "PNG preserva detalhes sem perdas e é o formato recomendado para impressão.",
+      "JPG produz arquivos menores, mas aplica compressão à imagem.",
+      "300 DPI mantém a quantidade atual de pixels; 150 reduz pela metade e 600 dobra.",
+    ],
+    warning: "Aumentar para 600 DPI não cria detalhes que não existiam na folha original, mas gera imagens maiores para o fluxo de impressão.",
   },
 
   // ---------------------------------------------------------------- maquina
@@ -601,19 +646,6 @@ export const HELP_TOPICS = {
       "Não edite a posição, o tamanho nem a rotação do SVG depois de gerar o PDF de marcas. Se mexer, gere o pacote novamente.",
     warning:
       "Imprima o PDF final em 100% de escala. Se o sistema operacional ajustar para caber na página, o corte sai fora do lugar.",
-  },
-  "diagnostico-cricut": {
-    title: "Diagnóstico Cricut em teste",
-    lead: "Um assistente de IA lê o relato do operador e os ajustes numéricos atuais para sugerir o que testar no alinhamento.",
-    howTo: [
-      "Escolha o tipo de problema que mais parece com o corte real.",
-      "Descreva onde o corte ficou fora do lugar, usando milímetros se você mediu.",
-      "Conte se já tentou recriar o molde, mudar a escala, virar a folha ou mexer na grade.",
-      "Envie o diagnóstico e guarde a resposta junto do teste físico.",
-    ],
-    when: "Use durante os testes da Cricut, principalmente quando o corte sai correto em uma região da folha e errado em outra.",
-    warning:
-      "PDFs, imagens e prévias não são enviados para a IA. O registro guarda texto, ajustes e o diagnóstico para ajudar a corrigir o sistema depois.",
   },
   "folha-personalizada": {
     title: "Folha personalizada",

@@ -14,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { HelpButton } from "@/components/HelpButton";
 import type { HelpTopicId } from "@/help/helpTopics";
 
@@ -33,7 +32,6 @@ function SectionLabel({ children, help }: { children: React.ReactNode; help?: He
 export function SizePanel({ composer, workspace }: { composer: Composer; workspace?: Workspace }) {
   const { config } = composer;
   const sizeId = matchCardSize(config.cardWidthMm, config.cardHeightMm);
-  const manual = config.finishMode === "manual";
 
   return (
     <div className="space-y-6">
@@ -99,28 +97,6 @@ export function SizePanel({ composer, workspace }: { composer: Composer; workspa
             />
           </div>
 
-          {manual && (
-            <div className="space-y-1.5">
-              <label className="flex items-start gap-3 rounded-lg border border-border bg-secondary/30 p-3">
-                <Switch
-                  checked={config.manualMarks.printRoundedOutline}
-                  onCheckedChange={(checked) =>
-                    composer.setConfig({
-                      ...config,
-                      manualMarks: { ...config.manualMarks, printRoundedOutline: checked },
-                    })
-                  }
-                  aria-label="Imprimir o contorno arredondado"
-                />
-                <span className="min-w-0">
-                  <span className="block text-xs font-medium text-foreground">
-                    Imprimir o contorno arredondado
-                  </span>
-                </span>
-              </label>
-              <HelpButton topic="contorno-impresso" label="entenda o contorno impresso" />
-            </div>
-          )}
         </section>
       )}
     </div>

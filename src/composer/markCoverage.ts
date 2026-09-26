@@ -1,6 +1,13 @@
 import type { Rect } from "@/cameo/types";
 import { registrationWhiteBackdropsMm, rectsIntersect } from "@/cut/geometry";
-import { backFaceRect, isGutterfold, gridFor, layoutSheets } from "./layoutSheets";
+import {
+  backClipRect,
+  backFaceRect,
+  backImageRect,
+  isGutterfold,
+  gridFor,
+  layoutSheets,
+} from "./layoutSheets";
 import { pageSizeMm } from "./paperSizes";
 import type { ComposerCard, ComposerConfig } from "./types";
 
@@ -50,7 +57,11 @@ function coveredCount(cards: ComposerCard[], config: ComposerConfig): number {
     for (const placed of sheet.placements) {
       const contentRects = isGutterfold(config)
         ? [placed.frontRectMm ?? placed.cutRectMm, backFaceRect(placed, config)]
-        : [placed.cutRectMm];
+        : [
+            config.cameoRegistrationSide === "back"
+              ? backFaceRect(placed, config)
+              : placed.cutRectMm,
+          ];
       if (areas.some((area) => contentRects.some((content) => rectsIntersect(content, area)))) count += 1;
     }
   }
@@ -108,10 +119,18 @@ export function markCoverage(cards: ComposerCard[], config: ComposerConfig): Mar
     for (const placed of sheet.placements) {
       const contentRects = isGutterfold(config)
         ? [placed.frontRectMm ?? placed.cutRectMm, backFaceRect(placed, config)]
-        : [placed.cutRectMm];
+        : [
+            config.cameoRegistrationSide === "back"
+              ? backFaceRect(placed, config)
+              : placed.cutRectMm,
+          ];
       const artRects = isGutterfold(config)
         ? [placed.imageRectMm, placed.backImageRectMm ?? backFaceRect(placed, config)]
-        : [placed.imageRectMm];
+        : [
+            config.cameoRegistrationSide === "back"
+              ? backImageRect(placed, config)
+              : placed.imageRectMm,
+          ];
       const hitsContent = areas.some((area) =>
         contentRects.some((content) => rectsIntersect(content, area)),
       );

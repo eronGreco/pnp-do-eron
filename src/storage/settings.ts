@@ -7,7 +7,6 @@ const KEY = "pnp-cameo:settings";
 export type StoredPreferences = {
   presetId: PresetId;
   settings: CutSettings;
-  diagnosticsOpen: boolean;
   registrationWhiteBorderMm: number;
   sliceConfig: SliceConfig;
 };
@@ -15,7 +14,6 @@ export type StoredPreferences = {
 export const DEFAULT_PREFERENCES: StoredPreferences = {
   presetId: "glossy",
   settings: presetById("glossy").settings,
-  diagnosticsOpen: false,
   registrationWhiteBorderMm: 6,
   sliceConfig: DEFAULT_SLICE_CONFIG,
 };
@@ -30,7 +28,6 @@ export function loadPreferences(): StoredPreferences {
     return {
       presetId: parsed.presetId ?? DEFAULT_PREFERENCES.presetId,
       settings: { ...DEFAULT_PREFERENCES.settings, ...(parsed.settings ?? {}) },
-      diagnosticsOpen: parsed.diagnosticsOpen ?? false,
       registrationWhiteBorderMm:
         typeof parsed.registrationWhiteBorderMm === "number"
           ? Math.min(10, Math.max(0, parsed.registrationWhiteBorderMm))

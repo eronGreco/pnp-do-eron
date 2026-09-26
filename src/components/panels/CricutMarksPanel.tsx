@@ -6,7 +6,6 @@ import { pageSizeMm } from "@/composer/paperSizes";
 import { cricutTemplateMatches } from "@/cricut/markTemplate";
 import { Button } from "@/components/ui/button";
 import { HelpButton } from "@/components/HelpButton";
-import { CricutDiagnosticsPanel } from "@/components/panels/CricutDiagnosticsPanel";
 import { CutExportPanel } from "@/components/panels/CutExportPanel";
 import type { Workspace } from "@/state/useWorkspace";
 
@@ -151,8 +150,6 @@ export function CricutMarksPanel({
         <FileDown className="size-3 shrink-0" aria-hidden />
         Só o SVG de corte vai para o Design Space. As imagens das cartas ficam aqui.
       </p>
-
-      <CricutDiagnosticsPanel composer={composer} />
     </section>
   );
 }

@@ -36,6 +36,7 @@ export function PreviewCanvas({
   const displaySide = gutterfold ? "front" : side;
   const pageIndex = displaySide === "front" ? sheet.frontPageIndex : sheet.backPageIndex;
   const showCameoOverlay = finishMode === "cameo";
+  const registrationSide = gutterfold ? "front" : (sheet.registrationSide ?? "front");
 
   useEffect(() => {
     let cancelled = false;
@@ -82,7 +83,7 @@ export function PreviewCanvas({
             viewBox={`0 0 ${size.width} ${size.height}`}
             preserveAspectRatio="none"
           >
-            {showCameoOverlay && displaySide === "front" && registrationWhiteBackdropsMm(
+            {showCameoOverlay && displaySide === registrationSide && registrationWhiteBackdropsMm(
               sheet.pageWidthMm,
               sheet.pageHeightMm,
               registrationWhiteBorderMm,
@@ -97,7 +98,7 @@ export function PreviewCanvas({
               />
             ))}
 
-            {showCameoOverlay && displaySide === "front" && sensorSafeZonesMm(sheet.pageWidthMm, sheet.pageHeightMm).map((zone, index) => (
+            {showCameoOverlay && displaySide === registrationSide && sensorSafeZonesMm(sheet.pageWidthMm, sheet.pageHeightMm).map((zone, index) => (
               <rect
                 key={`zone-${index}`}
                 x={scale(zone.x0)}
@@ -112,7 +113,7 @@ export function PreviewCanvas({
               />
             ))}
 
-            {showCameoOverlay && displaySide === "front" && registrationShapesMm(sheet.pageWidthMm, sheet.pageHeightMm).map((mark, index) => (
+            {showCameoOverlay && displaySide === registrationSide && registrationShapesMm(sheet.pageWidthMm, sheet.pageHeightMm).map((mark, index) => (
               <rect
                 key={`mark-${index}`}
                 x={scale(mark.x0)}
@@ -124,7 +125,7 @@ export function PreviewCanvas({
               />
             ))}
 
-            {displaySide === "front" &&
+            {displaySide === registrationSide &&
               sheet.cards.map((card) => {
                 const x = scale(card.cutRectMm.x0);
                 const y = scale(card.cutRectMm.y0);
@@ -209,7 +210,7 @@ export function PreviewCanvas({
           </div>
         )}
 
-        {!gutterfold && side === "back" && (
+        {!gutterfold && side === "back" && registrationSide !== "back" && (
           <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-md bg-destructive px-3 py-1 text-xs font-semibold tracking-wide text-destructive-foreground">
             VERSO • NÃO CORTAR
           </div>

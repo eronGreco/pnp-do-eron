@@ -21,7 +21,7 @@ export type StoredImage = Omit<ComposerImage, "previewUrl">;
 export type StoredComposerState = {
   images: StoredImage[];
   cards: ComposerCard[];
-  config: ComposerConfig;
+  config: ComposerConfig & { packingPolicy?: ComposerConfig["packingPolicy"] };
   importMode: ImportMode;
   cricutMarks?: StoredCricutMarksTemplate | null;
 };

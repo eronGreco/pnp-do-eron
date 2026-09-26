@@ -81,7 +81,6 @@ export function useWorkspace() {
       ...loadPreferences(),
       settings: next,
       presetId: matched,
-      diagnosticsOpen: false,
       registrationWhiteBorderMm,
     });
   }, [registrationWhiteBorderMm]);
@@ -94,7 +93,6 @@ export function useWorkspace() {
       ...loadPreferences(),
       settings: preset.settings,
       presetId: id,
-      diagnosticsOpen: false,
       registrationWhiteBorderMm,
     });
   }, [registrationWhiteBorderMm]);

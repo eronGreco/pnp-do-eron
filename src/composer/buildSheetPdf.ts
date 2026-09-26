@@ -8,6 +8,7 @@ import {
   popGraphicsState,
   pushGraphicsState,
   rgb,
+  degrees,
   type PDFPage,
 } from "pdf-lib";
 import type { Card, CutSettings, Rect, Sheet } from "@/cameo/types";
@@ -134,7 +135,18 @@ export async function buildSheetPdf(
           const backImage = await embed(placement.card, backImageId, "back");
           if (backImage) {
             beginClip(front, backClipRect(placement, layout.placements, config));
-            front.drawImage(backImage, box(backImageRect(placement, config)));
+            const imageBox = box(backImageRect(placement, config));
+            if (placement.backRotationDeg === 180) {
+              front.drawImage(backImage, {
+                x: imageBox.x + imageBox.width,
+                y: imageBox.y + imageBox.height,
+                width: imageBox.width,
+                height: imageBox.height,
+                rotate: degrees(180),
+              });
+            } else {
+              front.drawImage(backImage, imageBox);
+            }
             front.pushOperators(popGraphicsState());
           }
         } else {
@@ -146,14 +158,24 @@ export async function buildSheetPdf(
 
       const cameoMode = config.finishMode === "cameo";
       const backClip = gutterfold ? backClipRect(placement, layout.placements, config) : null;
+      const cutRectForMarks =
+        cameoMode && !gutterfold && config.cameoRegistrationSide === "back"
+          ? backRect(placement.cutRectMm, config)
+          : placement.cutRectMm;
       const inSafeZone =
         cameoMode &&
-        (artInSensorSafeZone(placement.clipRectMm, pageW, pageH) ||
+        (artInSensorSafeZone(
+          !gutterfold && config.cameoRegistrationSide === "back"
+            ? backClipRect(placement, layout.placements, config)
+            : placement.clipRectMm,
+          pageW,
+          pageH,
+        ) ||
           (backClip ? artInSensorSafeZone(backClip, pageW, pageH) : false));
       const hitsMark =
         cameoMode &&
         cutRectHitsRegistrationArea(
-          placement.cutRectMm,
+          cutRectForMarks,
           pageW,
           pageH,
           config.registrationWhiteBorderMm,
@@ -179,7 +201,7 @@ export async function buildSheetPdf(
         sheetNumber: layout.number,
         number: placement.number,
         imageRectMm: placement.imageRectMm,
-        cutRectMm: placement.cutRectMm,
+        cutRectMm: cutRectForMarks,
         selected: placement.card.selected,
         inSensorSafeZone: inSafeZone,
         hitsRegistrationMark: hitsMark,
@@ -193,13 +215,20 @@ export async function buildSheetPdf(
     }
 
     if (gutterfold) {
-      for (const placement of layout.placements) {
-        const fold = placement.gutterRectMm;
-        if (!fold) continue;
+      const folds = layout.sheetFoldRectMm
+        ? [layout.sheetFoldRectMm]
+        : layout.placements.flatMap((placement) => placement.gutterRectMm ? [placement.gutterRectMm] : []);
+      for (const fold of folds) {
+        const horizontal = fold.x1 - fold.x0 > fold.y1 - fold.y0;
         const centerX = (fold.x0 + fold.x1) / 2;
+        const centerY = (fold.y0 + fold.y1) / 2;
         front.drawLine({
-          start: { x: mmToPt(centerX), y: mmToPt(pageH - fold.y0) },
-          end: { x: mmToPt(centerX), y: mmToPt(pageH - fold.y1) },
+          start: horizontal
+            ? { x: mmToPt(fold.x0), y: mmToPt(pageH - centerY) }
+            : { x: mmToPt(centerX), y: mmToPt(pageH - fold.y0) },
+          end: horizontal
+            ? { x: mmToPt(fold.x1), y: mmToPt(pageH - centerY) }
+            : { x: mmToPt(centerX), y: mmToPt(pageH - fold.y1) },
           thickness: mmToPt(0.2),
           color: rgb(0.55, 0.55, 0.55),
           dashArray: [mmToPt(2), mmToPt(1.5)],
@@ -208,7 +237,7 @@ export async function buildSheetPdf(
       }
     }
 
-    if (config.finishMode === "cameo") {
+    if (config.finishMode === "cameo" && (gutterfold || config.cameoRegistrationSide === "front")) {
       for (const backdrop of registrationWhiteBackdropsMm(
         pageW,
         pageH,
@@ -301,6 +330,19 @@ export async function buildSheetPdf(
       back.pushOperators(popGraphicsState());
     }
 
+    if (config.finishMode === "cameo" && config.cameoRegistrationSide === "back") {
+      for (const backdrop of registrationWhiteBackdropsMm(
+        pageW,
+        pageH,
+        config.registrationWhiteBorderMm,
+      )) {
+        back.drawRectangle({ ...box(backdrop), color: rgb(1, 1, 1) });
+      }
+      for (const shape of registrationShapesMm(pageW, pageH)) {
+        back.drawRectangle({ ...box(shape), color: rgb(0, 0, 0) });
+      }
+    }
+
     if (config.finishMode === "manual" && marksOnSide(config.manualMarks, "back")) {
       for (const mark of manualMarkRectsMm(cutRects.map(toBack), config.manualMarks, pageW, pageH)) {
         back.drawRectangle({ ...box(mark), color: rgb(mr, mg, mb) });
@@ -318,6 +360,9 @@ export async function buildSheetPdf(
       pageHeightMm: pageH,
       cards: sheetCards,
       rotated: false,
+      ...(config.finishMode === "cameo"
+        ? { registrationSide: config.cameoRegistrationSide }
+        : {}),
     });
   }
 
