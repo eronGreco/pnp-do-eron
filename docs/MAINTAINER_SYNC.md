@@ -31,6 +31,6 @@ No sentido contrário, mudanças feitas na versão privada devem ser reaplicadas
 - Data: `2026-09-26`
 - Commit de origem: `65b33bec6cb6dc9231ce9984412c5de8f579d42a`
 - Pull Request público: `#2`
-- Commit público resultante: `pendente até o merge`
+- Commit público resultante: `245b556266121a90ff1410a7136031d7a76dd65d`
 
 Na próxima sincronização do privado para o público, use o commit de origem acima como base da comparação e atualize este bloco depois que o novo lote for validado e incorporado.
