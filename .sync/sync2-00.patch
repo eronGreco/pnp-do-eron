@@ -1,0 +1,325 @@
+diff --git a/local-bridge/cameo_protocol.py b/local-bridge/cameo_protocol.py
+index 07dfa06..a6e901c 100644
+--- a/local-bridge/cameo_protocol.py
++++ b/local-bridge/cameo_protocol.py
+@@ -42,6 +42,17 @@ BLOCK2 = (
+     b"TB99\x03"
+ )
+ 
++REG_ARM_DEFAULT_MM = 10.0
++
++
++def build_block2(mark_arm_mm=REG_ARM_DEFAULT_MM):
++    """BLOCK2 com o TB51 do braco do L. Com 10 mm e byte a byte o BLOCK2 congelado."""
++    tb51 = int(round(float(mark_arm_mm) * 20.0))
++    if tb51 == 200:
++        return BLOCK2
++    return BLOCK2.replace(b"TB51,200\x03", b"TB51,%d\x03" % tb51)
++
++
+ REG_X_MM = 10.0
+ REG_Y_MM = 10.0
+ REG_WIDTH_MM = 277.0
+@@ -231,7 +242,10 @@ class CameoSession:
+ 
+         raise CameoError("Timeout aguardando a Cameo voltar a READY.")
+ 
+-    def registration(self):
++    def registration(self, mark_arm_mm=REG_ARM_DEFAULT_MM):
++        block2 = build_block2(mark_arm_mm)
++        if block2 != BLOCK2:
++            self.log(f"ATENÇÃO: braço das marcas experimental de {mark_arm_mm:g} mm (não validado).")
+         self.log("Lendo as registration marks.")
+ 
+         self.reader.wait_armed()
+@@ -239,7 +253,7 @@ class CameoSession:
+ 
+         time.sleep(0.108)
+         self.reader.wait_armed()
+-        write_exact(self.k32, self.handle, BLOCK2)
++        write_exact(self.k32, self.handle, block2)
+ 
+         started = time.monotonic()
+         next_poll = started + 0.526
+@@ -343,7 +357,8 @@ def read_marks_only(log=None):
+ 
+ 
+ def cut_job(card_rects_mm, depth=4, force=18, speed=2, passes=1, radius_mm=3.0,
+-            line_overcut=False, line_overcut_mm=0.1, log=None, on_progress=None):
++            line_overcut=False, line_overcut_mm=0.1, log=None, on_progress=None,
++            mark_arm_mm=REG_ARM_DEFAULT_MM):
+     """READY -> registration -> AutoBlade -> cartas -> M0,0 -> READY."""
+     log = log or (lambda msg: None)
+ 
+@@ -353,7 +368,7 @@ def cut_job(card_rects_mm, depth=4, force=18, speed=2, passes=1, radius_mm=3.0,
+     with CameoSession(log=log) as s:
+         s.query_ready_initial()
+         log("Cameo pronta.")
+-        s.registration()
++        s.registration(mark_arm_mm)
+         s.configure_autoblade(depth, force, speed)
+ 
+         total = len(card_rects_mm)
+diff --git a/local-bridge/test_protocol_compatibility.py b/local-bridge/test_protocol_compatibility.py
+index 3675905..8659f84 100644
+--- a/local-bridge/test_protocol_compatibility.py
++++ b/local-bridge/test_protocol_compatibility.py
+@@ -45,6 +45,13 @@ class ProtocolCompatibilityTests(unittest.TestCase):
+         self.assertNotEqual(with_overcut, without_overcut)
+         self.assertEqual(len([c for c in with_overcut.split(b"\x03") if c]), 8)
+ 
++    def test_mark_arm_default_keeps_frozen_block2(self):
++        from cameo_protocol import BLOCK2, build_block2
++        self.assertIs(build_block2(10.0), BLOCK2)
++        custom = build_block2(15.0)
++        self.assertIn(b"TB51,300\x03", custom)
++        self.assertEqual(custom.replace(b"TB51,300", b"TB51,200"), BLOCK2)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+\ No newline at end of file
+diff --git a/local-bridge/validation.py b/local-bridge/validation.py
+index caf2956..9c96aae 100644
+--- a/local-bridge/validation.py
++++ b/local-bridge/validation.py
+@@ -22,8 +22,14 @@ ALLOWED_JOB_KEYS = {
+     "sheet", "cards", "settings",
+     "depth", "force", "speed", "passes",
+     "radiusMm", "lineOvercut", "lineOvercutMm",
++    "markArmMm", "sheetWidthMm", "sheetHeightMm",
+ }
+ 
++# Braco do L das marcas. 10 mm e o unico valor validado fisicamente;
++# 10 a 20 mm e experimental e muda somente o TB51.
++MARK_ARM_DEFAULT_MM = 10.0
++MARK_ARM_RANGE_MM = (10.0, 20.0)
++
+ 
+ def _int_in_range(payload, key):
+     value = payload.get(key)
+@@ -90,6 +96,20 @@ def validate_job(payload):
+ 
+         cards.append((x0, y0, x1, y1))
+ 
++    mark_arm = payload.get("markArmMm", MARK_ARM_DEFAULT_MM)
++    if not isinstance(mark_arm, (int, float)) or isinstance(mark_arm, bool):
++        raise CameoError("Parâmetro inválido: tamanho da marca.")
++    if not MARK_ARM_RANGE_MM[0] <= float(mark_arm) <= MARK_ARM_RANGE_MM[1]:
++        raise CameoError("Parâmetro fora da faixa permitida: tamanho da marca.")
++
++    # O registration congelado so conhece A4 deitada.
++    sw = payload.get("sheetWidthMm", A4_W_MM)
++    sh = payload.get("sheetHeightMm", A4_H_MM)
++    if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (sw, sh)):
++        raise CameoError("Tamanho de folha inválido.")
++    if abs(float(sw) - A4_W_MM) > 0.5 or abs(float(sh) - A4_H_MM) > 0.5:
++        raise CameoError("O programa local só corta folha A4 deitada (297 x 210 mm).")
++
+     sheet = payload.get("sheet", 1)
+     if not isinstance(sheet, int) or isinstance(sheet, bool) or sheet < 1:
+         raise CameoError("Número de folha inválido.")
+@@ -104,4 +124,5 @@ def validate_job(payload):
+         "radius_mm": float(radius),
+         "line_overcut": line_overcut,
+         "line_overcut_mm": float(line_overcut_mm),
++        "mark_arm_mm": float(mark_arm),
+     }
+diff --git a/src/__tests__/cricutAlign.test.ts b/src/__tests__/cricutAlign.test.ts
+new file mode 100644
+index 0000000..6374bce
+--- /dev/null
++++ b/src/__tests__/cricutAlign.test.ts
+@@ -0,0 +1,60 @@
++import { describe, expect, it } from "vitest";
++import { layoutSheets } from "@/composer/layoutSheets";
++import { DEFAULT_COMPOSER_CONFIG, type ComposerCard, type ComposerConfig } from "@/composer/types";
++import {
++  cricutDesignSizeMismatch,
++  cricutMarkOffsetMm,
++  cricutMarkRectsMm,
++  sheetDesignRectMm,
++  type CricutMarkPage,
++} from "@/cricut/markTemplate";
++
++const config: ComposerConfig = { ...DEFAULT_COMPOSER_CONFIG, finishMode: "cricut" };
++const cards: ComposerCard[] = Array.from({ length: 4 }, (_, i) => ({
++  id: `c${i}`,
++  frontImageId: "x",
++  backImageId: null,
++  selected: true,
++}));
++
++function page(design: { x0: number; y0: number; x1: number; y1: number } | null): CricutMarkPage {
++  return {
++    sheetNumber: 1,
++    bytes: new ArrayBuffer(0),
++    previewUrl: "",
++    widthPx: 210,
++    heightPx: 297,
++    darkPixels: 1,
++    bounds: [{ x0Px: 10, y0Px: 10, x1Px: 20, y1Px: 20 }],
++    corners: ["TL", "TR", "BL", "BR"],
++    designRectMm: design,
++  };
++}
++
++describe("alinhamento Cricut", () => {
++  const layout = layoutSheets(cards, config)[0];
++  const here = layout ? sheetDesignRectMm(layout, config) : null;
++
++  it("desloca as marcas junto com a area do desenho", () => {
++    expect(here).not.toBeNull();
++    if (!here || !layout) return;
++    const w = here.x1 - here.x0;
++    const h = here.y1 - here.y0;
++    const design = { x0: 15, y0: 15, x1: 15 + w, y1: 15 + h };
++    const offset = cricutMarkOffsetMm(page(design), layout, config);
++    expect(offset.dx).toBeCloseTo(here.x0 - 15);
++    expect(offset.dy).toBeCloseTo(here.y0 - 15);
++    const [mark] = cricutMarkRectsMm(page(design), 210, 297, offset);
++    expect(mark?.x0).toBeCloseTo(10 + offset.dx);
++    expect(cricutDesignSizeMismatch(page(design), layout, config)).toBeNull();
++  });
++
++  it("avisa quando o tamanho do desenho mudou", () => {
++    if (!layout) return;
++    expect(cricutDesignSizeMismatch(page({ x0: 10, y0: 10, x1: 50, y1: 50 }), layout, config)).not.toBeNull();
++  });
++
++  it("sem area lida, mantem as marcas no lugar", () => {
++    expect(cricutMarkOffsetMm(page(null), layout, config)).toEqual({ dx: 0, dy: 0 });
++  });
++});
+diff --git a/src/cameo/LocalBridgeTransport.ts b/src/cameo/LocalBridgeTransport.ts
+index 72f9691..93a744a 100644
+--- a/src/cameo/LocalBridgeTransport.ts
++++ b/src/cameo/LocalBridgeTransport.ts
+@@ -134,6 +134,7 @@ export class LocalBridgeTransport implements CameoTransport {
+       ...(job.sheetWidthMm && job.sheetHeightMm
+         ? { sheetWidthMm: job.sheetWidthMm, sheetHeightMm: job.sheetHeightMm }
+         : {}),
++      ...(job.markArmMm && job.markArmMm !== 10 ? { markArmMm: job.markArmMm } : {}),
+       cards: job.cards.map((rect) => ({
+         x0Mm: rect.x0,
+         y0Mm: rect.y0,
+diff --git a/src/cameo/types.ts b/src/cameo/types.ts
+index 434c5ea..678fbae 100644
+--- a/src/cameo/types.ts
++++ b/src/cameo/types.ts
+@@ -31,6 +31,8 @@ export type Sheet = {
+   rotated: boolean;
+   /** Lado que contém as marcas do sensor e deve ficar para cima no corte. */
+   registrationSide?: "front" | "back";
++  /** Braco do L das marcas em mm. Ausente = 10 mm validado. */
++  registrationArmMm?: number;
+ };
+ 
+ export type CutSettings = {
+@@ -48,6 +50,8 @@ export type CutJob = {
+   /** Tamanho da folha em mm. Sem isso, o programa local assume A4 deitada. */
+   sheetWidthMm?: number;
+   sheetHeightMm?: number;
++  /** Braco do L das marcas impressas. Ausente = 10 mm validado (TB51,200). */
++  markArmMm?: number;
+   cards: Rect[];
+   settings: CutSettings;
+ };
+diff --git a/src/components/LayoutPreview.tsx b/src/components/LayoutPreview.tsx
+index 4c6b077..8d55aae 100644
+--- a/src/components/LayoutPreview.tsx
++++ b/src/components/LayoutPreview.tsx
+@@ -13,6 +13,7 @@ import {
+   isGutterfold,
+ } from "@/composer/layoutSheets";
+ import { pageSizeMm } from "@/composer/paperSizes";
++import { cameoMarkArmMm } from "@/composer/types";
+ import { backImageFor } from "@/composer/pairFrontBack";
+ import {
+   registrationShapesMm,
+@@ -20,7 +21,7 @@ import {
+ } from "@/cut/geometry";
+ import { sensorSafeZonesMm } from "@/cut/geometry";
+ import { manualMarkCss, manualMarkRectsMm, marksOnSide } from "@/cut/manualMarks";
+-import { cricutMarkRectsMm, templatePageForSheet } from "@/cricut/markTemplate";
++import { cricutMarkOffsetMm, sheetDesignRectMm, templatePageForSheet } from "@/cricut/markTemplate";
+ import { Button } from "@/components/ui/button";
+ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+ 
+@@ -133,7 +134,10 @@ export function LayoutPreview({
+     config.finishMode === "cricut" && side === "front"
+       ? templatePageForSheet(composer.cricutMarks, layout.number)
+       : null;
+-  const cricutMarks = cricutMarkPage ? cricutMarkRectsMm(cricutMarkPage, pageW, pageH) : [];
++  const cricutOffset = cricutMarkPage
++    ? cricutMarkOffsetMm(cricutMarkPage, layout, config)
++    : { dx: 0, dy: 0 };
++  const cricutDesign = cricutMarkPage ? sheetDesignRectMm(layout, config) : null;
+   const manualMarks =
+     config.finishMode === "manual" && (gutterfold || marksOnSide(config.manualMarks, side))
+       ? manualMarkRectsMm(
+@@ -851,7 +855,7 @@ export function LayoutPreview({
+           ))}
+ 
+           {cameoMode &&
+-            sensorSafeZonesMm(page.widthMm, page.heightMm).map((zone, index) => (
++            sensorSafeZonesMm(page.widthMm, page.heightMm, cameoMarkArmMm(config)).map((zone, index) => (
+               <rect
+                 key={`zone-${index}`}
+                 x={zone.x0}
+@@ -871,6 +875,7 @@ export function LayoutPreview({
+               page.widthMm,
+               page.heightMm,
+               config.registrationWhiteBorderMm,
++              cameoMarkArmMm(config),
+             ).map((backdrop, index) => (
+               <rect
+                 key={`backdrop-${index}`}
+@@ -884,7 +889,7 @@ export function LayoutPreview({
+ 
+           {cameoMode &&
+             side === cameoMarksSide &&
+-            registrationShapesMm(page.widthMm, page.heightMm).map((mark, index) => (
++            registrationShapesMm(page.widthMm, page.heightMm, cameoMarkArmMm(config)).map((mark, index) => (
+               <rect
+                 key={`mark-${index}`}
+                 x={mark.x0}
+@@ -895,17 +900,30 @@ export function LayoutPreview({
+               />
+             ))}
+ 
+-          {cricutMarks.map((mark, index) => (
++          {cricutMarkPage && (
++            <image
++              href={cricutMarkPage.previewUrl}
++              x={cricutOffset.dx}
++              y={cricutOffset.dy}
++              width={pageW}
++              height={pageH}
++              preserveAspectRatio="none"
++              pointerEvents="none"
++            />
++          )}
++          {cricutMarkPage && cricutDesign && (
+             <rect
+-              key={`cricut-${index}`}
+-              x={mark.x0}
+-              y={mark.y0}
+-              width={mark.x1 - mark.x0}
+-              height={mark.y1 - mark.y0}
+-              fill="black"
++              x={cricutDesign.x0}
++              y={cricutDesign.y0}
++              width={cricutDesign.x1 - cricutDesign.x0}
++              height={cricutDesign.y1 - cricutDesign.y0}
++              fill="none"
++              stroke="var(--primary)"
++              strokeWidth={0.4}
++              strokeDasharray="2 1.5"
+               pointerEvents="none"
+             />
+-          ))}
++          )}
+         </svg>
+ 
+         {pendingImages > 0 && (
