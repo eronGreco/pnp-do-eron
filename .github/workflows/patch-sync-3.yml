@@ -17,76 +17,64 @@ jobs:
         with:
           ref: sync/lovable-2026-09-26-3-clean
 
-      - name: Apply exact regression patch and remove old temp workflow
+      - name: Patch regression test and remove failed helper
         shell: python
         run: |
           from pathlib import Path
 
           path = Path("src/__tests__/regression.test.ts")
-          text = path.read_text(encoding="utf-8")
+          lines = path.read_text(encoding="utf-8").splitlines()
 
-          old = '''  it("acomoda 8 cartas de 57x89 mm em duas fileiras", () => {
-            const grid = gridFor({
-              ...DEFAULT_COMPOSER_CONFIG,
-              cardWidthMm: 57,
-              cardHeightMm: 89,
-              bleedMm: 5,
-              gapMm: 2,
-              bleedMode: "compartilhada",
-            });
+          first_test = 'it("acomoda 8 cartas de 57x89 mm em duas fileiras", () => {'
+          next_test = 'it("centraliza uma carta sem reservar os outros sete espaços da grade", () => {'
+          new_test = 'it("a grade automatica nunca coloca carta dentro da borda branca das marcas", () => {'
 
-            expect(grid.columns).toBe(4);
-            expect(grid.rows).toBe(2);
-            expect(grid.perSheet).toBe(8);
-          });
+          starts = [i for i, line in enumerate(lines) if line.strip() == first_test]
+          if len(starts) != 1:
+              raise SystemExit(f"Expected one capacity test, found {len(starts)}")
+          start = starts[0]
 
-          it("centraliza uma carta sem reservar os outros sete espaços da grade", () => {'''
+          nexts = [i for i, line in enumerate(lines[start + 1:], start + 1) if line.strip() == next_test]
+          if len(nexts) != 1:
+              raise SystemExit(f"Expected one following test, found {len(nexts)}")
+          end = nexts[0]
 
-          new = '''  it("acomoda 8 cartas de 57x89 mm em duas fileiras", () => {
-            const grid = gridFor({
-              ...DEFAULT_COMPOSER_CONFIG,
-              cardWidthMm: 57,
-              cardHeightMm: 89,
-              bleedMm: 5,
-              gapMm: 2,
-              bleedMode: "compartilhada",
-              registrationWhiteBorderMm: 1,
-            });
+          border_lines = [i for i in range(start, end) if "registrationWhiteBorderMm:" in lines[i]]
+          if not border_lines:
+              bleed_line = next(i for i in range(start, end) if lines[i].strip() == 'bleedMode: "compartilhada",')
+              indent = lines[bleed_line][:-len(lines[bleed_line].lstrip())]
+              lines.insert(bleed_line + 1, indent + "registrationWhiteBorderMm: 1,")
 
-            expect(grid.columns).toBe(4);
-            expect(grid.rows).toBe(2);
-            expect(grid.perSheet).toBe(8);
-          });
+          if not any(line.strip() == new_test for line in lines):
+              end = next(i for i, line in enumerate(lines[start + 1:], start + 1) if line.strip() == next_test)
+              block = [
+                  '  it("a grade automatica nunca coloca carta dentro da borda branca das marcas", () => {',
+                  '    const config = {',
+                  '      ...DEFAULT_COMPOSER_CONFIG,',
+                  '      cardWidthMm: 57,',
+                  '      cardHeightMm: 89,',
+                  '      bleedMm: 5,',
+                  '      gapMm: 2,',
+                  '      bleedMode: "compartilhada" as const,',
+                  '    };',
+                  '    const cards = Array.from({ length: 8 }, (_, i) => ({',
+                  '      id: `c${i}`,',
+                  '      frontImageId: "x",',
+                  '      backImageId: null,',
+                  '      selected: true,',
+                  '    }));',
+                  '    const sheet = layoutSheets(cards, config)[0];',
+                  '    for (const p of sheet?.placements ?? []) {',
+                  '      expect(',
+                  '        cutRectHitsRegistrationArea(p.cutRectMm, A4_W, A4_H, config.registrationWhiteBorderMm),',
+                  '      ).toBe(false);',
+                  '    }',
+                  '  });',
+                  '',
+              ]
+              lines[end:end] = block
 
-          it("a grade automatica nunca coloca carta dentro da borda branca das marcas", () => {
-            const config = {
-              ...DEFAULT_COMPOSER_CONFIG,
-              cardWidthMm: 57,
-              cardHeightMm: 89,
-              bleedMm: 5,
-              gapMm: 2,
-              bleedMode: "compartilhada" as const,
-            };
-            const cards = Array.from({ length: 8 }, (_, i) => ({
-              id: `c${i}`,
-              frontImageId: "x",
-              backImageId: null,
-              selected: true,
-            }));
-            const sheet = layoutSheets(cards, config)[0];
-            for (const p of sheet?.placements ?? []) {
-              expect(
-                cutRectHitsRegistrationArea(p.cutRectMm, A4_W, A4_H, config.registrationWhiteBorderMm),
-              ).toBe(false);
-            }
-          });
-
-          it("centraliza uma carta sem reservar os outros sete espaços da grade", () => {'''
-
-          if text.count(old) != 1:
-              raise SystemExit(f"Expected exactly one target block, found {text.count(old)}")
-
-          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
           temp = Path(".github/workflows/temp-patch-regression.yml")
           if temp.exists():
@@ -97,7 +85,8 @@ jobs:
         run: |
           git config user.name "Eron Greco Melo"
           git config user.email "92898024+eronGreco@users.noreply.github.com"
-          git add src/__tests__/regression.test.ts .github/workflows/temp-patch-regression.yml
+          git add -A
           git diff --cached --check
+          git diff --cached -- src/__tests__/regression.test.ts .github/workflows/temp-patch-regression.yml
           git commit -m "test: align regression coverage with Cameo safety border"
           git push origin HEAD:sync/lovable-2026-09-26-3-clean
