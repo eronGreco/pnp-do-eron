@@ -122,7 +122,11 @@ function selectedComponents(
   return { components, corners: [...corners] };
 }
 
-/** Area do desenho: tudo que nao e branco dentro da pagina, fora das marcas. */
+/**
+ * Area do desenho: tudo que nao e branco dentro da caixa das marcas, fora dos
+ * pixels das proprias marcas. Sem faixa de folga: no Design Space a primeira
+ * coluna de cartas pode comecar na mesma linha do braco do L.
+ */
 function designRect(
   source: ImageData,
   marks: Component[],
@@ -130,19 +134,24 @@ function designRect(
 ): { x0: number; y0: number; x1: number; y1: number } | null {
   const { width, height, data } = source;
   const markMask = new Uint8Array(width * height);
-  const pad = Math.round(pxPerMm * 1);
   for (const m of marks) {
-    for (let y = Math.max(0, m.bounds.y0Px - pad); y < Math.min(height, m.bounds.y1Px + pad); y += 1) {
-      for (let x = Math.max(0, m.bounds.x0Px - pad); x < Math.min(width, m.bounds.x1Px + pad); x += 1) {
-        markMask[y * width + x] = 1;
+    for (const index of m.pixels) {
+      const x = index % width;
+      const y = Math.floor(index / width);
+      // 1 px de folga cobre o antisserrilhado da borda da marca.
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < width && ny < height) markMask[ny * width + nx] = 1;
+        }
       }
     }
   }
-  const inset = Math.round(pxPerMm * 3);
-  const fx0 = Math.min(...marks.map((m) => m.bounds.x0Px)) + inset;
-  const fy0 = Math.min(...marks.map((m) => m.bounds.y0Px)) + inset;
-  const fx1 = Math.max(...marks.map((m) => m.bounds.x1Px)) - inset;
-  const fy1 = Math.max(...marks.map((m) => m.bounds.y1Px)) - inset;
+  const fx0 = Math.min(...marks.map((m) => m.bounds.x0Px));
+  const fy0 = Math.min(...marks.map((m) => m.bounds.y0Px));
+  const fx1 = Math.max(...marks.map((m) => m.bounds.x1Px));
+  const fy1 = Math.max(...marks.map((m) => m.bounds.y1Px));
   let x0 = width;
   let y0 = height;
   let x1 = -1;
