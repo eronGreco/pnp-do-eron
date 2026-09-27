@@ -62,7 +62,7 @@ export function CricutMarksPanel({
 
       <div className="grid grid-cols-[24px_1fr] gap-x-2 gap-y-2 text-[11px]">
         <Step n="1" text="Baixe o Pacote Cricut com o SVG de corte." />
-        <Step n="2" text="Abra o SVG no Design Space sem mudar tamanho nem posição." />
+        <Step n="2" text="Abra o SVG no Design Space sem mudar tamanho nem posição. O retângulo do tamanho da folha só serve de base: apague ele do corte antes de cortar." />
         <Step n="3" text="Use Print Then Cut e salve o PDF com as marcas, sem editar. Pode deixar o contorno de corte: ele ajuda a alinhar." />
         <Step n="4" text={`Importe esse PDF aqui antes de montar ${gutterfold ? "as peças" : "as cartas"}.`} />
       </div>
