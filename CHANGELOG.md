@@ -24,6 +24,7 @@ As mudanças relevantes do PNP do Eron são registradas neste arquivo.
 - Quando a sangria específica do verso está desativada, o verso passa a reutilizar a sangria gerada da frente em vez de esticar a arte original dentro da margem.
 - IDs de imagens importadas agora são únicos entre sessões, evitando colisões com imagens restauradas de um trabalho salvo.
 - A grade automática da Cameo passa a reservar também a borda branca configurada ao redor das marcas, evitando montar cartas em posições que seriam rejeitadas depois pela auditoria.
+- A cobertura de regressão foi atualizada para validar que a grade automática não coloca cortes dentro da área protegida das marcas.
 
 ## 2026-09-26 - atualização 2
 
