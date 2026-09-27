@@ -1,0 +1,103 @@
+name: Patch sync 3
+
+on:
+  push:
+    branches:
+      - maintenance/patch-sync-3
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v5
+        with:
+          ref: sync/lovable-2026-09-26-3-clean
+
+      - name: Apply exact regression patch and remove old temp workflow
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("src/__tests__/regression.test.ts")
+          text = path.read_text(encoding="utf-8")
+
+          old = '''  it("acomoda 8 cartas de 57x89 mm em duas fileiras", () => {
+            const grid = gridFor({
+              ...DEFAULT_COMPOSER_CONFIG,
+              cardWidthMm: 57,
+              cardHeightMm: 89,
+              bleedMm: 5,
+              gapMm: 2,
+              bleedMode: "compartilhada",
+            });
+
+            expect(grid.columns).toBe(4);
+            expect(grid.rows).toBe(2);
+            expect(grid.perSheet).toBe(8);
+          });
+
+          it("centraliza uma carta sem reservar os outros sete espaços da grade", () => {'''
+
+          new = '''  it("acomoda 8 cartas de 57x89 mm em duas fileiras", () => {
+            const grid = gridFor({
+              ...DEFAULT_COMPOSER_CONFIG,
+              cardWidthMm: 57,
+              cardHeightMm: 89,
+              bleedMm: 5,
+              gapMm: 2,
+              bleedMode: "compartilhada",
+              registrationWhiteBorderMm: 1,
+            });
+
+            expect(grid.columns).toBe(4);
+            expect(grid.rows).toBe(2);
+            expect(grid.perSheet).toBe(8);
+          });
+
+          it("a grade automatica nunca coloca carta dentro da borda branca das marcas", () => {
+            const config = {
+              ...DEFAULT_COMPOSER_CONFIG,
+              cardWidthMm: 57,
+              cardHeightMm: 89,
+              bleedMm: 5,
+              gapMm: 2,
+              bleedMode: "compartilhada" as const,
+            };
+            const cards = Array.from({ length: 8 }, (_, i) => ({
+              id: `c${i}`,
+              frontImageId: "x",
+              backImageId: null,
+              selected: true,
+            }));
+            const sheet = layoutSheets(cards, config)[0];
+            for (const p of sheet?.placements ?? []) {
+              expect(
+                cutRectHitsRegistrationArea(p.cutRectMm, A4_W, A4_H, config.registrationWhiteBorderMm),
+              ).toBe(false);
+            }
+          });
+
+          it("centraliza uma carta sem reservar os outros sete espaços da grade", () => {'''
+
+          if text.count(old) != 1:
+              raise SystemExit(f"Expected exactly one target block, found {text.count(old)}")
+
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          temp = Path(".github/workflows/temp-patch-regression.yml")
+          if temp.exists():
+              temp.unlink()
+
+      - name: Commit target branch
+        shell: bash
+        run: |
+          git config user.name "Eron Greco Melo"
+          git config user.email "92898024+eronGreco@users.noreply.github.com"
+          git add src/__tests__/regression.test.ts .github/workflows/temp-patch-regression.yml
+          git diff --cached --check
+          git commit -m "test: align regression coverage with Cameo safety border"
+          git push origin HEAD:sync/lovable-2026-09-26-3-clean
