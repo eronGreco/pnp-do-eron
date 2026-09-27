@@ -55,7 +55,7 @@ As mudanças relevantes do PNP do Eron são registradas neste arquivo.
 - Quando as marcas do sensor bloqueiam posições da grade, o sistema passa a sugerir alternativas de organização que possam aproveitar melhor a folha.
 - Adicionado atalho direto do aviso de grade para o ajuste da borda branca das marcas.
 - Campos numéricos agora permitem digitação livre durante a edição e normalizam o valor ao confirmar ou sair do campo.
-- Prévia, auditoria de tamanho, áreas seguras e mensagens de ajuda foram atualizadas para considerar o tamanho configurado das marcas e os novos formatos de folha.
+- Prévia, auditoria de tamanho, áreas seguras e mensagens de ajuda foram atualizados para considerar o tamanho configurado das marcas e os novos formatos de folha.
 
 
 ## 2026-09-26
