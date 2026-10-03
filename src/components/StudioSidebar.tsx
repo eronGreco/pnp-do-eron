@@ -417,8 +417,8 @@ export function StudioSidebar({
                   <p className="truncate text-[11px] text-muted-foreground">{doc.fileName}</p>
                   <p className="text-[11px] text-muted-foreground">
                     {sheet.assemblyMode === "gutterfold"
-                      ? `Folha ${workspace.activeSheet} de ${doc.sheets.length} · gutterfold em página ${sheet.frontPageIndex + 1}`
-                      : `Folha ${workspace.activeSheet} de ${doc.sheets.length} · frente = página ${sheet.frontPageIndex + 1}`}
+                      ? `Folha ${workspace.activeSheet} de ${doc.sheets.length} · gutterfold em página ${(sheet.frontPageIndex ?? 0) + 1}`
+                      : `Folha ${workspace.activeSheet} de ${doc.sheets.length} · ${sheet.frontPageIndex !== null ? `frente = página ${sheet.frontPageIndex + 1}` : `verso = página ${(sheet.backPageIndex ?? 0) + 1}`}`}
                   </p>
                   <SheetSelector
                     sheets={doc.sheets}

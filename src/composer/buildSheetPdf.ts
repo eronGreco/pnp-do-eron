@@ -38,8 +38,57 @@ import {
 } from "./layoutSheets";
 import { pageSizeMm } from "./paperSizes";
 import { backImageFor } from "./pairFrontBack";
-import type { ComposerCard, ComposerConfig, ComposerImage } from "./types";
+import type { ComposerCard, ComposerConfig, ComposerImage, PageOrder } from "./types";
 import { cameoMarkArmMm } from "./types";
+
+
+/**
+ * Decide quais paginas entram no PDF final e em que ordem, e recalcula os
+ * indices de frente e verso de cada folha. Com nenhum verso util no trabalho,
+ * as paginas de verso sao omitidas em todos os modos. Quando ao menos uma folha
+ * tem verso, os versos vazios das demais ficam para manter a paridade da
+ * impressao frente e verso (e da realimentacao das folhas).
+ */
+export function planPageOrder(
+  sheets: Sheet[],
+  jobHasBack: boolean,
+  order: PageOrder,
+): { sourceIndexes: number[]; sheets: Sheet[]; warnings: string[] } {
+  const warnings: string[] = [];
+  let mode = order;
+  if (!jobHasBack && mode === "versos") {
+    warnings.push("Nenhuma carta tem verso. O PDF saiu só com as frentes.");
+    mode = "frentes";
+  }
+  const sourceIndexes: number[] = [];
+  const out = sheets.map((sheet) => ({ ...sheet, frontPageIndex: null as number | null, backPageIndex: null as number | null }));
+  const takeFront = (i: number) => {
+    const src = sheets[i]!.frontPageIndex;
+    if (src === null) return;
+    out[i]!.frontPageIndex = sourceIndexes.length;
+    sourceIndexes.push(src);
+  };
+  const takeBack = (i: number) => {
+    const src = sheets[i]!.backPageIndex;
+    if (src === null || !jobHasBack) return;
+    out[i]!.backPageIndex = sourceIndexes.length;
+    sourceIndexes.push(src);
+  };
+  if (mode === "intercalado") {
+    sheets.forEach((_, i) => {
+      takeFront(i);
+      takeBack(i);
+    });
+  } else if (mode === "frentes") {
+    sheets.forEach((_, i) => takeFront(i));
+  } else if (mode === "versos") {
+    sheets.forEach((_, i) => takeBack(i));
+  } else {
+    sheets.forEach((_, i) => takeFront(i));
+    sheets.forEach((_, i) => takeBack(i));
+  }
+  return { sourceIndexes, sheets: out, warnings };
+}
 
 export type ComposedDocument = {
   bytes: ArrayBuffer;
@@ -116,6 +165,7 @@ export async function buildSheetPdf(
   };
 
   const sheets: Sheet[] = [];
+  const sheetsWithBackContent = new Set<number>();
 
   for (const layout of layouts) {
     const front = doc.addPage([mmToPt(pageW), mmToPt(pageH)]);
@@ -329,6 +379,7 @@ export async function buildSheetPdf(
 
     const back = doc.addPage([mmToPt(pageW), mmToPt(pageH)]);
     const backIndex = doc.getPageCount() - 1;
+    let backHasContent = false;
 
     // Correcao digital do desalinhamento da impressora: move so o verso.
     const toBack = (r: Rect) => backRect(r, config);
@@ -338,12 +389,14 @@ export async function buildSheetPdf(
       if (!backImageId) continue;
       const image = await embed(placement.card, backImageId, "back");
       if (!image) continue;
+      backHasContent = true;
       beginClip(back, backClipRect(placement, layout.placements, config));
       back.drawImage(image, box(backImageRect(placement, config)));
       back.pushOperators(popGraphicsState());
     }
 
     if (config.finishMode === "cameo" && config.cameoRegistrationSide === "back") {
+      backHasContent = true;
       for (const backdrop of registrationWhiteBackdropsMm(
         pageW,
         pageH,
@@ -357,6 +410,11 @@ export async function buildSheetPdf(
       }
     }
 
+    // Guilhotina: marcas "so no verso" sao escolha deliberada e justificam a
+    // pagina de verso; "ambos" ou "frente" nao criam verso so por marcas.
+    if (config.finishMode === "manual" && config.manualMarks.sides === "verso") {
+      backHasContent = true;
+    }
     if (config.finishMode === "manual" && marksOnSide(config.manualMarks, "back")) {
       for (const mark of manualMarkRectsMm(cutRects.map(toBack), config.manualMarks, pageW, pageH)) {
         back.drawRectangle({ ...box(mark), color: rgb(mr, mg, mb) });
@@ -365,6 +423,7 @@ export async function buildSheetPdf(
     drawRoundedOutlines(back, cutRects.map(toBack), "back");
 
 
+    if (backHasContent) sheetsWithBackContent.add(layout.number);
     sheets.push({
       number: layout.number,
       frontPageIndex: frontIndex,
@@ -380,16 +439,24 @@ export async function buildSheetPdf(
     });
   }
 
-  // Receita de corte viaja dentro do PDF: so geometria e parametros.
-  doc.setKeywords([encodeJobManifest(sheets, settings)]);
+  // Organiza as paginas num unico PDF, sem criar versos vazios inuteis.
+  const plan = planPageOrder(sheets, sheetsWithBackContent.size > 0, config.pageOrder ?? "intercalado");
+  warnings.push(...plan.warnings);
+  const output = await PDFDocument.create();
+  const copied = await output.copyPages(doc, plan.sourceIndexes);
+  for (const page of copied) output.addPage(page);
+  const finalSheets = plan.sheets;
 
-  const saved = await doc.save({ useObjectStreams: false });
+  // Receita de corte viaja dentro do PDF: so geometria e parametros.
+  output.setKeywords([encodeJobManifest(finalSheets, settings)]);
+
+  const saved = await output.save({ useObjectStreams: false });
   const bytes = new ArrayBuffer(saved.byteLength);
   new Uint8Array(bytes).set(saved);
 
   return {
     bytes,
-    sheets,
+    sheets: finalSheets,
     fileName: "cartas montadas - impressao.pdf",
     warnings,
     errors,

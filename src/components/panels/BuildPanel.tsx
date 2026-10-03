@@ -7,7 +7,11 @@ import { backImageFor } from "@/composer/pairFrontBack";
 import { Field } from "@/components/panels/Field";
 import { Button } from "@/components/ui/button";
 import { HelpButton } from "@/components/HelpButton";
-import { AlertTriangle, Download, Hammer } from "lucide-react";
+import { AlertTriangle, Download, Hammer, ImageDown } from "lucide-react";
+import type { PageOrder } from "@/composer/types";
+import { jobHasBackContent, marksPassWarning } from "@/composer/pageOrderChecks";
+import { composedPagesToImages } from "@/composer/exportPageImages";
+import { downloadBlob } from "@/slicer/sliceImages";
 import { CutExportPanel } from "@/components/panels/CutExportPanel";
 import { cricutTemplateMatches } from "@/cricut/markTemplate";
 import { DisabledConfig } from "@/components/panels/DisabledConfig";
@@ -30,6 +34,7 @@ export function BuildPanel({
   workspace: Workspace;
 }) {
   const [confirmRiskyDownload, setConfirmRiskyDownload] = useState(false);
+  const [exportingImages, setExportingImages] = useState(false);
   const { cards, grid, layouts } = composer;
   const cricutMode = composer.config.finishMode === "cricut";
   const gutterfold = composer.config.assemblyMode === "gutterfold";
@@ -38,6 +43,41 @@ export function BuildPanel({
   const missingBacks = gutterfold
     ? cards.filter((card) => backImageFor(card, composer.config) === null).length
     : 0;
+  const jobHasBack = jobHasBackContent(cards, composer.config);
+  const marksWarning = marksPassWarning(composer.config);
+  const pageOrder: PageOrder = composer.config.pageOrder ?? "intercalado";
+  const PAGE_ORDERS: { id: PageOrder; label: string; needsBack: boolean }[] = [
+    { id: "intercalado", label: "Frente e verso intercalados", needsBack: false },
+    { id: "frentes", label: "Somente frentes", needsBack: false },
+    { id: "versos", label: "Somente versos", needsBack: true },
+    { id: "frentes-depois-versos", label: "Todas as frentes, depois os versos", needsBack: true },
+  ];
+  const builtDoc = workspace.doc?.origin === "composer" ? workspace.doc : null;
+  const exportImages = async () => {
+    if (!builtDoc) return;
+    setExportingImages(true);
+    try {
+      const result = await composedPagesToImages(builtDoc.bytes, builtDoc.sheets);
+      downloadBlob(result.blob, result.fileName);
+      workspace.addLog(
+        result.pages === 1
+          ? "Página salva como PNG a 300 DPI."
+          : `${result.pages} páginas salvas como PNG a 300 DPI, num arquivo ZIP.`,
+        "ok",
+      );
+      if (result.failed.length > 0) {
+        workspace.addLog(`Não consegui salvar a(s) página(s) ${result.failed.join(", ")} como imagem.`, "warn");
+      }
+    } catch (error) {
+      workspace.addLog(
+        "Não consegui salvar as páginas como imagem.",
+        "error",
+        error instanceof Error ? error.message : String(error),
+      );
+    } finally {
+      setExportingImages(false);
+    }
+  };
   const cricutReady = cricutTemplateMatches(composer.cricutMarks, composer.cricutTemplateStamp);
   const cricutBlocked = cricutMode && !cricutReady;
   const riskyIssues = [
@@ -151,6 +191,51 @@ export function BuildPanel({
         </div>
       )}
 
+      <section className="space-y-2 border-t border-border pt-4">
+        <h3 className="section-label">Páginas do PDF</h3>
+        <DisabledConfig
+          disabled={gutterfold}
+          reason="No gutterfold, frente e verso ficam na mesma página, então não há o que reorganizar."
+        >
+          <div className="grid grid-cols-1 gap-1.5" role="group" aria-label="Organização das páginas">
+            {PAGE_ORDERS.map((option) => {
+              const blocked = gutterfold || (option.needsBack && !jobHasBack);
+              return (
+                <Button
+                  key={option.id}
+                  size="sm"
+                  variant={pageOrder === option.id ? "default" : "outline"}
+                  aria-pressed={pageOrder === option.id}
+                  disabled={blocked}
+                  className="h-8 justify-start text-xs"
+                  onClick={() => composer.setConfig({ ...composer.config, pageOrder: option.id })}
+                >
+                  {option.label}
+                </Button>
+              );
+            })}
+          </div>
+          {!gutterfold && !jobHasBack && cards.length > 0 && (
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Nenhuma carta tem verso, então o PDF sai sem páginas de verso. As opções com versos ficam
+              desligadas.
+            </p>
+          )}
+          {!gutterfold && jobHasBack && (
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Sempre um único PDF. Quando só algumas folhas têm verso, as demais mantêm uma página
+              de verso em branco para a frente e o verso continuarem casando na impressão. O lado
+              das marcas é escolhido na etapa Folha e marcas.
+            </p>
+          )}
+          {marksWarning && (
+            <p role="alert" className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-[11px] leading-relaxed text-warning">
+              {marksWarning}
+            </p>
+          )}
+        </DisabledConfig>
+      </section>
+
       <div className="space-y-1.5">
         <Button
           className="w-full"
@@ -180,6 +265,21 @@ export function BuildPanel({
             Baixar novamente
           </Button>
         )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 w-full text-xs"
+          onClick={() => void exportImages()}
+          disabled={!builtDoc || composer.outdated || composer.working || exportingImages}
+        >
+          <ImageDown className="mr-1.5 size-3.5" aria-hidden />
+          {exportingImages ? "Salvando as imagens" : "Salvar páginas como PNG (300 DPI)"}
+        </Button>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Para programas que não abrem PDF, como o Silhouette Studio gratuito. Monte o PDF antes.
+          Várias páginas saem num arquivo ZIP.
+        </p>
 
         <HelpButton topic="montar-folhas" label="entenda o montar folhas" />
       </div>

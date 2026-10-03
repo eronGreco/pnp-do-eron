@@ -13,3 +13,5 @@ Preserve a confiabilidade do fluxo Print & Play, a privacidade dos arquivos do u
 - Preserve compatibilidade com o PNP Cameo Bridge ao alterar contratos em `src/cameo/`.
 - Antes de concluir mudanças relevantes, rode `bun run test`, `bun run typecheck` e `bun run build`.
 - Novos recursos devem incluir testes quando houver lógica determinística testável.
+- A ordem final das páginas do PDF deve ser decidida em `planPageOrder` (`src/composer/buildSheetPdf.ts`), que também remapeia `frontPageIndex` e `backPageIndex`; manter essa lógica centralizada evita divergência entre páginas, prévia e receita de corte.
+- A detecção das marcas da Cricut fica concentrada em `src/cricut/detectMarks.ts`, com busca geométrica das marcas em L e compatibilidade com o leitor legado; manter essa lógica isolada facilita testes e evita depender dos cantos físicos da folha.

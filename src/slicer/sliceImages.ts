@@ -20,17 +20,23 @@ function pdfPageName(fileName: string, pageNumber: number, pageCount: number): s
   return `${baseName} - página ${String(pageNumber).padStart(digits, "0")}.png`;
 }
 
-async function loadPdfPages(file: File): Promise<{ images: SliceImage[]; rejected: string[] }> {
-  const images: SliceImage[] = [];
-  const rejected: string[] = [];
+/**
+ * Renderiza cada pagina do PDF em PNG a 300 DPI, no navegador. Mesmo caminho
+ * usado pelo Fatiar folha e pela exportacao de imagens do Montar folhas.
+ */
+export async function renderPdfPagesToPng(
+  bytes: ArrayBuffer,
+  onPage: (page: { pageNumber: number; pageCount: number; blob: Blob; widthPx: number; heightPx: number }) => void | Promise<void>,
+  onError?: (pageNumber: number) => void,
+  pageIndexes?: number[],
+): Promise<number> {
   const pdfjs = await getPdfjs();
-  const bytes = await file.arrayBuffer();
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes) }).promise;
-
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes.slice(0)) }).promise;
   try {
-    if (doc.numPages === 0) return { images, rejected: [`${file.name}: o PDF não tem páginas.`] };
-
-    for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
+    const numbers = pageIndexes
+      ? pageIndexes.map((index) => index + 1)
+      : Array.from({ length: doc.numPages }, (_, i) => i + 1);
+    for (const pageNumber of numbers) {
       try {
         const page = await doc.getPage(pageNumber);
         const viewport = page.getViewport({ scale: PDF_RENDER_SCALE });
@@ -43,25 +49,38 @@ async function loadPdfPages(file: File): Promise<{ images: SliceImage[]; rejecte
         context.fillRect(0, 0, canvas.width, canvas.height);
         await page.render({ canvas, canvasContext: context, viewport }).promise;
         const blob = await canvasToBlob(canvas, "image/png");
-        counter += 1;
-        images.push({
-          id: `slice-${counter}`,
-          name: pdfPageName(file.name, pageNumber, doc.numPages),
-          mime: "image/png",
-          blob,
-          widthPx: canvas.width,
-          heightPx: canvas.height,
-          previewUrl: URL.createObjectURL(blob),
-        });
+        await onPage({ pageNumber, pageCount: doc.numPages, blob, widthPx: canvas.width, heightPx: canvas.height });
         page.cleanup();
       } catch {
-        rejected.push(`${file.name}, página ${pageNumber}: não consegui abrir esta página.`);
+        onError?.(pageNumber);
       }
     }
+    return doc.numPages;
   } finally {
     await doc.cleanup();
   }
+}
 
+async function loadPdfPages(file: File): Promise<{ images: SliceImage[]; rejected: string[] }> {
+  const images: SliceImage[] = [];
+  const rejected: string[] = [];
+  const pageCount = await renderPdfPagesToPng(
+    await file.arrayBuffer(),
+    ({ pageNumber, pageCount, blob, widthPx, heightPx }) => {
+      counter += 1;
+      images.push({
+        id: `slice-${counter}`,
+        name: pdfPageName(file.name, pageNumber, pageCount),
+        mime: "image/png",
+        blob,
+        widthPx,
+        heightPx,
+        previewUrl: URL.createObjectURL(blob),
+      });
+    },
+    (pageNumber) => rejected.push(`${file.name}, página ${pageNumber}: não consegui abrir esta página.`),
+  );
+  if (pageCount === 0) return { images, rejected: [`${file.name}: o PDF não tem páginas.`] };
   return { images, rejected };
 }
 

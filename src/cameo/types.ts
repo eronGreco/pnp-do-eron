@@ -21,7 +21,8 @@ export type Card = {
 
 export type Sheet = {
   number: number;
-  frontPageIndex: number;
+  /** Null quando o PDF foi montado so com versos. */
+  frontPageIndex: number | null;
   backPageIndex: number | null;
   /** Modo usado para montar a folha. Ausente em PDFs antigos. */
   assemblyMode?: "normal" | "gutterfold";

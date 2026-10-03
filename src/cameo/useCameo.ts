@@ -182,7 +182,7 @@ export function useCameo(workspace: Workspace, enabled = true) {
         const next = index >= 0 ? sheets[index + 1] : undefined;
         if (next) {
           addLog(
-            `Troque a folha na Cameo: carregue a folha ${next.number} de ${sheets.length} (frente = página ${next.frontPageIndex + 1}) e confirme antes de cortar.`,
+            `Troque a folha na Cameo: carregue a folha ${next.number} de ${sheets.length} ${next.frontPageIndex !== null ? `(frente = página ${next.frontPageIndex + 1})` : "(frente fora deste PDF)"} e confirme antes de cortar.`,
             "warn",
           );
           setActiveSheet(next.number);

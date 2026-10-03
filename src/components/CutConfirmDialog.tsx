@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { presetById, type PresetId } from "@/storage/presets";
+import { registrationPageIndex } from "@/cameo/registrationPage";
 
 type Props = {
   open: boolean;
@@ -33,10 +34,7 @@ export function CutConfirmDialog({
 }: Props) {
   const gutterfold = sheet.assemblyMode === "gutterfold";
   const registrationSide = sheet.registrationSide === "back" ? "verso" : "frente";
-  const registrationPageIndex =
-    sheet.registrationSide === "back" && sheet.backPageIndex !== null
-      ? sheet.backPageIndex
-      : sheet.frontPageIndex;
+  const registrationPage = registrationPageIndex(sheet);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -53,7 +51,7 @@ export function CutConfirmDialog({
           <Row label="Folha" value={`${sheet.number} de ${totalSheets}`} />
           <Row
             label={gutterfold ? "Página" : `Página do ${registrationSide}`}
-            value={`${registrationPageIndex + 1}`}
+            value={registrationPage !== null ? `${registrationPage + 1}` : "não incluída neste PDF"}
           />
           <Row
             label={gutterfold ? "Peças" : "Cartas"}
@@ -69,6 +67,13 @@ export function CutConfirmDialog({
             value={settings.lineOvercut ? `ligado (${settings.lineOvercutMm} mm)` : "desligado"}
           />
         </dl>
+
+        {registrationPage === null && (
+          <p role="alert" className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-xs leading-relaxed text-warning">
+            Este PDF não contém a página com as marcas ({registrationSide}). Só corte se a folha
+            carregada já foi impressa com as marcas em outra passada.
+          </p>
+        )}
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>

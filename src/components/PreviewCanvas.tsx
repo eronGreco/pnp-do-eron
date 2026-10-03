@@ -33,7 +33,7 @@ export function PreviewCanvas({
   const [error, setError] = useState<string | null>(null);
 
   const gutterfold = sheet.assemblyMode === "gutterfold";
-  const displaySide = gutterfold ? "front" : side;
+  const displaySide = gutterfold ? "front" : sheet.frontPageIndex === null && sheet.backPageIndex !== null ? "back" : side;
   const pageIndex = displaySide === "front" ? sheet.frontPageIndex : sheet.backPageIndex;
   const showCameoOverlay = finishMode === "cameo";
   const registrationSide = gutterfold ? "front" : (sheet.registrationSide ?? "front");
@@ -62,7 +62,7 @@ export function PreviewCanvas({
   if (pageIndex === null) {
     return (
       <div className="flex h-full min-h-[420px] items-center justify-center rounded-lg border border-border bg-card text-sm text-muted-foreground">
-        Esta folha não possui verso.
+        {displaySide === "front" ? "Este PDF não inclui a frente desta folha." : "Esta folha não possui verso."}
       </div>
     );
   }

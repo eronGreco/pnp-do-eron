@@ -19,6 +19,7 @@ import {
   type CricutMarksTemplate,
 } from "@/cricut/markTemplate";
 import { buildSheetPdf } from "./buildSheetPdf";
+import { marksPassWarning } from "./pageOrderChecks";
 import { buildStampOf } from "./buildStamp";
 import { importImages, releaseImages } from "./importImages";
 import { gridFor, layoutSheets } from "./layoutSheets";
@@ -449,6 +450,8 @@ export function useComposer(workspace: Workspace) {
         "ok",
       );
       for (const warning of composed.warnings) workspace.addLog(warning, "warn");
+      const passWarning = marksPassWarning(config);
+      if (passWarning) workspace.addLog(passWarning, "warn");
       for (const error of composed.errors) workspace.addLog(error, "error");
 
       if (composed.errors.length === 0 || allowRiskyDownload) {

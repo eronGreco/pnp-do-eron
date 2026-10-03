@@ -13,7 +13,8 @@ export function SheetSelector({ sheets, activeSheet, side, onSheet, onSide }: Pr
   const sheet = sheets.find((item) => item.number === activeSheet) ?? sheets[0];
   const gutterfold = sheet?.assemblyMode === "gutterfold";
   const hasBack = sheet?.backPageIndex !== null;
-  const displaySide = gutterfold ? "front" : side;
+  const hasFront = sheet?.frontPageIndex !== null;
+  const displaySide = gutterfold ? "front" : !hasFront && hasBack ? "back" : side;
 
   return (
     <div className="space-y-3">
@@ -45,6 +46,7 @@ export function SheetSelector({ sheets, activeSheet, side, onSheet, onSide }: Pr
               className="flex-1"
               variant={displaySide === "front" ? "default" : "secondary"}
               onClick={() => onSide("front")}
+              disabled={!hasFront}
             >
               Frente
             </Button>

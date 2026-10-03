@@ -33,8 +33,9 @@ export const PAPER_SIZES: Record<Exclude<PaperSize, "custom">, PageSizeMm> = {
   oficio: { widthMm: 356, heightMm: 216 },
   // Bolsa de plastificacao A4 padrao do mercado brasileiro (Polaseal e
   // equivalentes, 220 x 307 mm), muito usada em PnP para plastificar as
-  // folhas antes do corte.
-  polaseal: { widthMm: 220, heightMm: 307 },
+  // folhas antes do corte. Guardada na base deitada, como os demais
+  // tamanhos: Paisagem = 307 x 220, Retrato = 220 x 307.
+  polaseal: { widthMm: 307, heightMm: 220 },
 };
 
 export const PAPER_LABELS: Record<PaperSize, string> = {

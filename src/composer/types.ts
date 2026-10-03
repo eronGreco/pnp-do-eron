@@ -7,6 +7,8 @@ import {
 import { DEFAULT_BLEED_CONFIG, type BleedConfig } from "@/bleed/types";
 import type { PaperOrientation, PaperSize } from "./paperSizes";
 
+export type PageOrder = "intercalado" | "frentes" | "versos" | "frentes-depois-versos";
+
 export type ComposerImage = {
   id: string;
   name: string;
@@ -122,6 +124,8 @@ export type ComposerConfig = {
    * Serve para deixar a borda solida do verso mais exposta dentro da carta.
    */
   backInsetMm: number;
+  /** Organizacao das paginas no PDF final. Padrao: frente e verso intercalados. */
+  pageOrder: PageOrder;
 };
 
 export const BACK_OFFSET_LIMIT_MM = 10;
@@ -164,4 +168,5 @@ export const DEFAULT_COMPOSER_CONFIG: ComposerConfig = {
   backBleed: DEFAULT_BLEED_CONFIG,
   backExtraBleedMm: 2,
   backInsetMm: 0,
+  pageOrder: "intercalado",
 };

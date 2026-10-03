@@ -24,7 +24,7 @@ type MCard = {
 
 type MSheet = {
   n: number;
-  f: number;
+  f: number | null;
   b: number | null;
   w: number;
   h: number;

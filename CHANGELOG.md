@@ -2,6 +2,56 @@
 
 As mudanças relevantes do PNP do Eron são registradas neste arquivo.
 
+## 2026-10-02 - atualização 4
+
+### Montar folhas: ordem das páginas e frente/verso
+
+- O PDF final pode ser organizado como **Frente e verso intercalados**, **Somente frentes**, **Somente versos** ou **Todas as frentes, depois os versos**.
+- O modo intercalado continua como padrão para preservar o comportamento anterior.
+- Páginas de verso totalmente inúteis deixam de ser geradas quando o trabalho não possui arte de verso efetiva.
+- O verso compartilhado do baralho continua contando como verso mesmo quando a carta não tem `backImageId` próprio.
+- Quando apenas algumas folhas têm verso, as páginas em branco necessárias são preservadas para manter o pareamento correto entre frente e verso na impressão.
+- No modo Guilhotina, marcas configuradas em **Frente e verso** ou **Só na frente** não criam sozinhas páginas de verso; quando o usuário escolhe explicitamente **Só no verso**, a página de verso é mantida mesmo sem arte.
+- `frontPageIndex` e `backPageIndex` passam a aceitar lados ausentes e são recalculados depois da omissão ou reordenação das páginas; o manifesto embutido no PDF acompanha a nova ordem.
+
+### Avisos e prévia ao imprimir em passadas separadas
+
+- O passo **Montar folhas** avisa quando a organização escolhida exclui o lado que contém as marcas de corte da Silhouette, Cricut ou Guilhotina, sem bloquear fluxos legítimos de primeira e segunda passada.
+- A confirmação de corte da Cameo deixa de apontar para a página do lado errado quando a página das marcas não faz parte do PDF e passa a informar claramente que ela não está incluída.
+- Em PDFs gerados somente com versos, a prévia muda automaticamente para o verso e o botão **Frente** fica desativado.
+- A interface diferencia corretamente páginas ausentes de folhas que simplesmente não possuem verso.
+
+### Exportação das folhas montadas como imagem
+
+- O passo **6. Montar folhas** ganhou a opção **Salvar páginas como PNG (300 DPI)**.
+- A exportação reutiliza o mesmo pipeline de renderização já usado pelo **Fatiar folha**, evitando regras diferentes para o mesmo PDF.
+- PDFs de uma página geram um PNG direto; PDFs com várias páginas geram um ZIP para evitar vários downloads separados.
+- Os arquivos recebem nomes com número da página, folha e lado, como `1 - folha 1 - frente.png` e `4 - folha 1 - verso.png`.
+- A exportação fica indisponível antes da montagem e também quando as configurações mudam e tornam a montagem atual desatualizada.
+
+### Cricut: leitura de marcas internas mais robusta
+
+- O detector deixa de depender da proximidade das marcas com os cantos físicos da folha e passa a procurar um retângulo coerente de registro em qualquer região da página.
+- Componentes são classificados pela geometria das marcas em L e por sua densidade, descartando blocos pretos grandes pertencentes às cartas.
+- O detector aceita um conjunto coerente de três cantos e pode completar um quarto canto formado por braços desconectados usando o leitor legado.
+- A detecção da área real do desenho (`designRect`) continua ignorando apenas os pixels das marcas, preservando as correções anteriores de alinhamento do Design Space.
+- Foram adicionadas regressões baseadas no padrão observado em um PDF A4 real: três Ls conectados, um canto com braços separados e seis blocos pretos de cartas.
+
+### Polaseal e orientação da folha
+
+- Corrigido o preset **Polaseal A4 (220 × 307 mm)**, que estava com a orientação invertida.
+- **Paisagem** agora corresponde a **307 × 220 mm** e **Retrato** a **220 × 307 mm**, mantendo o nome comercial do preset na interface.
+
+### Silhouette Cameo: proteção da geometria validada
+
+- A espessura validada das marcas em L permanece em **1 mm**; nenhuma alteração de posição foi aplicada por diferença meramente visual em relação ao Silhouette Studio.
+- Novos testes travam o recuo externo, a espessura, as medidas usadas no protocolo de registration e a origem do corte, evitando regressões acidentais de 0,5 mm.
+
+### Cobertura de regressão
+
+- Adicionados testes para Polaseal, ordem das páginas, PDFs sem versos inúteis, verso compartilhado, marcas manuais só no verso, manifesto após reordenação, nomes dos PNGs, leitura Cricut com marcas internas e páginas ausentes no fluxo de corte.
+- A seleção de uma carta continua significando **seleção para corte**; cartas desmarcadas continuam participando da montagem do PDF.
+
 ## 2026-09-26 - atualização 3
 
 ### Cricut: SVG no tamanho correto no Design Space
