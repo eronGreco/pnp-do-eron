@@ -158,12 +158,15 @@ const MARK_CLEARANCE_MM = 1;
 function blockedAreas(config: ComposerConfig): Rect[] {
   if (config.finishMode !== "cameo") return [];
   const page = pageSizeMm(config);
+  // Mesma area que a conferencia trata como erro (marca + borda branca),
+  // para a grade automatica nunca montar algo que depois seria recusado.
+  const border = Math.max(MARK_CLEARANCE_MM, config.registrationWhiteBorderMm ?? 0);
   return registrationShapesMm(page.widthMm, page.heightMm, cameoMarkArmMm(config)).map((mark) =>
     rect(
-      Math.max(0, mark.x0 - MARK_CLEARANCE_MM),
-      Math.max(0, mark.y0 - MARK_CLEARANCE_MM),
-      Math.min(page.widthMm, mark.x1 + MARK_CLEARANCE_MM),
-      Math.min(page.heightMm, mark.y1 + MARK_CLEARANCE_MM),
+      Math.max(0, mark.x0 - border),
+      Math.max(0, mark.y0 - border),
+      Math.min(page.widthMm, mark.x1 + border),
+      Math.min(page.heightMm, mark.y1 + border),
     ),
   );
 }

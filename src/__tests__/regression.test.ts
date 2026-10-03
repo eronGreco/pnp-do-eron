@@ -238,11 +238,35 @@ describe("N: aproveitamento da folha com sangria compartilhada", () => {
       bleedMm: 5,
       gapMm: 2,
       bleedMode: "compartilhada",
+      registrationWhiteBorderMm: 1,
     });
 
     expect(grid.columns).toBe(4);
     expect(grid.rows).toBe(2);
     expect(grid.perSheet).toBe(8);
+  });
+
+  it("a grade automatica nunca coloca carta dentro da borda branca das marcas", () => {
+    const config = {
+      ...DEFAULT_COMPOSER_CONFIG,
+      cardWidthMm: 57,
+      cardHeightMm: 89,
+      bleedMm: 5,
+      gapMm: 2,
+      bleedMode: "compartilhada" as const,
+    };
+    const cards = Array.from({ length: 8 }, (_, i) => ({
+      id: `c${i}`,
+      frontImageId: "x",
+      backImageId: null,
+      selected: true,
+    }));
+    const sheet = layoutSheets(cards, config)[0];
+    for (const p of sheet?.placements ?? []) {
+      expect(
+        cutRectHitsRegistrationArea(p.cutRectMm, A4_W, A4_H, config.registrationWhiteBorderMm),
+      ).toBe(false);
+    }
   });
 
   it("centraliza uma carta sem reservar os outros sete espaços da grade", () => {

@@ -17,6 +17,14 @@ function nf(value: number): string {
   return Number(value.toFixed(4)).toString();
 }
 
+const MM_PER_IN = 25.4;
+const CRICUT_SVG_DPI = 72;
+
+/** Converte mm para px assumindo 72 DPI, a leitura que o Design Space faz de um SVG sem unidade. */
+function mmToCricutPx(mm: number): number {
+  return (mm / MM_PER_IN) * CRICUT_SVG_DPI;
+}
+
 /** Polilinha fechada de uma carta, em mm, com Y crescendo para baixo. */
 function cardPoints(r: Rect, radiusMm: number): Point[] {
   const w = r.x1 - r.x0;
@@ -118,28 +126,50 @@ export function toSvg(sheet: CutExportSheet, radiusMm: number): string {
   ].join("\n");
 }
 
-/** SVG especifico para abrir no Cricut Design Space, somente com cortes. */
-export function toCricutSvg(sheet: CutExportSheet, radiusMm: number): string {
-  const paths = sheet.rects
-    .map((rect, index) => {
+/** Um unico "d" com um subcaminho fechado por carta, igual ao Affinity: mantem as cartas juntas como uma peca so, sem o usuario precisar selecionar e unir cada corte no Design Space. */
+function cricutCutPathData(sheet: CutExportSheet, radiusMm: number): string {
+  return sheet.rects
+    .map((rect) => {
       const points = cardPoints(rect, radiusMm);
       const d = points
-        .map((point, pointIndex) => `${pointIndex === 0 ? "M" : "L"} ${nf(point.x)} ${nf(point.y)}`)
+        .map(
+          (point, pointIndex) =>
+            `${pointIndex === 0 ? "M" : "L"} ${nf(mmToCricutPx(point.x))} ${nf(mmToCricutPx(point.y))}`,
+        )
         .join(" ");
-      return `    <path id="carta-${index + 1}" d="${d} Z" fill="none" stroke="#000000" stroke-width="0.1" vector-effect="non-scaling-stroke" />`;
+      return `${d} Z`;
     })
-    .join("\n");
+    .join(" ");
+}
+
+/**
+ * SVG especifico para abrir no Cricut Design Space, somente com cortes.
+ * Design Space nao usa o width/height/viewBox do <svg> para calcular o
+ * tamanho real do desenho importado: ele mede a caixa delimitadora do que
+ * esta desenhado. Sem um retangulo invisivel do tamanho exato da folha (sem
+ * preenchimento nem traco), uma folha com poucas cartas marcadas fica com
+ * uma caixa delimitadora bem menor que a folha inteira, e o Design Space
+ * importa nesse tamanho errado. E tambem nao basta declarar "mm" com um
+ * viewBox: ja testamos width/height em mm (igual ao toSvg) com o mesmo
+ * retangulo-ancora e voltou a importar gigante. A unica combinacao
+ * confirmada por teste real no Design Space e: "px" explicito no width e no
+ * height (sem viewBox), com os numeros ja convertidos a 72 DPI
+ * (1 mm = 72/25.4 px) tanto na folha quanto nas cartas, mais o
+ * retangulo-ancora do tamanho da folha inteira. Nao trocar de unidade de novo
+ * sem testar no Design Space primeiro.
+ */
+export function toCricutSvg(sheet: CutExportSheet, radiusMm: number): string {
+  const widthPx = mmToCricutPx(sheet.widthMm);
+  const heightPx = mmToCricutPx(sheet.heightMm);
+  const d = cricutCutPathData(sheet, radiusMm);
 
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${nf(sheet.widthMm)}mm" height="${nf(
-      sheet.heightMm,
-    )}mm" viewBox="0 0 ${nf(sheet.widthMm)} ${nf(sheet.heightMm)}">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${nf(widthPx)}px" height="${nf(heightPx)}px">`,
     `  <title>PNP do Eron Cricut folha ${sheet.number}</title>`,
     `  <desc>Arquivo sem imagens. Use no Cricut Design Space em tamanho real para gerar as marcas de Print Then Cut.</desc>`,
-    `  <g id="linhas-de-corte" fill="none" stroke="#000000">`,
-    paths,
-    "  </g>",
+    `  <rect id="folha" x="0" y="0" width="${nf(widthPx)}" height="${nf(heightPx)}" fill="none" />`,
+    `  <path id="linhas-de-corte" d="${d}" fill="none" stroke="#000000" stroke-width="0.3" vector-effect="non-scaling-stroke" />`,
     "</svg>",
     "",
   ].join("\n");
@@ -185,8 +215,9 @@ export function cricutReadmeText(): string {
     "PNP do Eron - Pacote Cricut",
     "",
     "1. Abra cada SVG no Cricut Design Space.",
-    "2. Confira se o tamanho ficou em milímetros e em escala real.",
+    "2. Confira se o tamanho ficou em escala real antes de continuar. Não mude tamanho nem posição.",
     "3. Use Print Then Cut e salve o PDF que o Design Space gera com marcas.",
+    "   O retângulo do tamanho da folha só serve de base: apague ele do corte antes de cortar.",
     "4. Volte ao PNP do Eron e importe esse PDF de marcas.",
     "5. Monte o PDF final das cartas e imprima sempre em 100% de escala.",
     "",

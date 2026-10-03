@@ -52,6 +52,16 @@ export function useBleed(
           bleed: config.backBleed,
           bleedMm: config.backExtraBleedMm,
         });
+      } else if (backImageId && !config.backBleed.enabled && config.bleed.enabled && config.bleedMm > 0) {
+        // Sem sangria propria no verso, ele recebe a mesma sangria criada da
+        // frente; senao a arte original seria esticada na area com margem.
+        const signature = bleedSignature(config.bleed, config);
+        byKey.set(artKey(backImageId, signature), {
+          imageId: backImageId,
+          signature,
+          bleed: config.bleed,
+          bleedMm: config.bleedMm,
+        });
       }
     }
     return [...byKey.values()];
@@ -138,9 +148,14 @@ export function useBleed(
   /** Arte que deve ser usada para uma carta: a gerada quando existir. */
   const artFor = useCallback(
     (card: ComposerCard, imageId: string, side: ArtSide = "front"): ComposerImage | undefined => {
-      const bleed = side === "back" ? config.backBleed : effectiveCardBleed(card, config.bleed);
+      const backOwn = side === "back" && config.backBleed.enabled;
+      const bleed = backOwn
+        ? config.backBleed
+        : side === "back"
+          ? config.bleed
+          : effectiveCardBleed(card, config.bleed);
       if (!bleed.enabled) return undefined;
-      const bleedMm = side === "back" ? config.backExtraBleedMm : config.bleedMm;
+      const bleedMm = backOwn ? config.backExtraBleedMm : config.bleedMm;
       if (bleedMm <= 0) return undefined;
       return generated.get(artKey(imageId, bleedSignature(bleed, { ...config, bleedMm })));
     },

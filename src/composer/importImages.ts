@@ -38,7 +38,8 @@ export async function importImages(files: File[]): Promise<{
 
     counter += 1;
     images.push({
-      id: `img-${counter}`,
+      // Unico entre sessoes: imagens restauradas mantem seus ids salvos.
+      id: `img-${Date.now().toString(36)}-${counter}-${crypto.randomUUID().slice(0, 8)}`,
       name: file.name,
       mime: file.type,
       bytes,

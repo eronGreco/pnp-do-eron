@@ -2,6 +2,30 @@
 
 As mudanças relevantes do PNP do Eron são registradas neste arquivo.
 
+## 2026-09-26 - atualização 3
+
+### Cricut: SVG no tamanho correto no Design Space
+
+- O Pacote Cricut passa a gerar o SVG em pixels calculados a 72 DPI e sem `viewBox`, formato confirmado em teste real no Cricut Design Space para preservar a escala física da folha.
+- Adicionado um retângulo sem preenchimento do tamanho completo da folha como âncora de dimensão, evitando que uma folha com poucas cartas seja importada pelo tamanho apenas da área desenhada.
+- Os recortes das cartas passam a ser subcaminhos de um único caminho, mantendo as linhas de corte agrupadas no Design Space.
+- O retângulo da folha serve apenas como referência de tamanho e deve ser removido do corte antes de cortar; as instruções do painel e do pacote foram atualizadas.
+- Os exportadores SVG e DXF genéricos e o fluxo da Silhouette Cameo não mudam com esse ajuste.
+
+### Cricut: alinhamento das marcas
+
+- A leitura da área ocupada pelo desenho no PDF do Design Space não descarta mais uma faixa fixa depois das marcas.
+- O detector passa a mascarar somente os pixels reais das marcas, com uma pequena folga para antisserrilhamento, permitindo reconhecer corretamente a primeira coluna quando ela começa alinhada ao braço em L.
+- Corrigido o deslocamento horizontal observado nas marcas quando as cartas começavam junto ao braço em L do Design Space.
+- Moldes de marcas criados com a leitura anterior devem ser importados novamente para usar o alinhamento corrigido.
+
+### Sangria, persistência e grade Cameo
+
+- Quando a sangria específica do verso está desativada, o verso passa a reutilizar a sangria gerada da frente em vez de esticar a arte original dentro da margem.
+- IDs de imagens importadas agora são únicos entre sessões, evitando colisões com imagens restauradas de um trabalho salvo.
+- A grade automática da Cameo passa a reservar também a borda branca configurada ao redor das marcas, evitando montar cartas em posições que seriam rejeitadas depois pela auditoria.
+- A cobertura de regressão foi atualizada para validar que a grade automática não coloca cortes dentro da área protegida das marcas.
+
 ## 2026-09-26 - atualização 2
 
 ### Cricut: leitura e alinhamento das marcas
@@ -31,7 +55,7 @@ As mudanças relevantes do PNP do Eron são registradas neste arquivo.
 - Quando as marcas do sensor bloqueiam posições da grade, o sistema passa a sugerir alternativas de organização que possam aproveitar melhor a folha.
 - Adicionado atalho direto do aviso de grade para o ajuste da borda branca das marcas.
 - Campos numéricos agora permitem digitação livre durante a edição e normalizam o valor ao confirmar ou sair do campo.
-- Prévia, auditoria de tamanho, áreas seguras e mensagens de ajuda foram atualizadas para considerar o tamanho configurado das marcas e os novos formatos de folha.
+- Prévia, auditoria de tamanho, áreas seguras e mensagens de ajuda foram atualizados para considerar o tamanho configurado das marcas e os novos formatos de folha.
 
 
 ## 2026-09-26
