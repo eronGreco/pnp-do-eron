@@ -111,8 +111,7 @@ O projeto inclui presets usados no mercado de jogos de tabuleiro e também aceit
 - Orientação paisagem ou retrato quando compatível com o acabamento escolhido.
 - Em folhas personalizadas, largura e altura são respeitadas exatamente como digitadas.
 
-> [!NOTE]
-> Na Silhouette Cameo, o corte direto pelo PNP Cameo Bridge permanece fisicamente validado em **A4 paisagem**. Outros formatos que cabem na largura da máquina podem aparecer como experimentais na montagem; A3 e Ofício permanecem bloqueados no modo Cameo.
+> ℹ️ **Nota — Silhouette Cameo:** o corte direto pelo PNP Cameo Bridge permanece fisicamente validado em **A4 paisagem**. Outros formatos que cabem na largura da máquina podem aparecer como experimentais na montagem; A3 e Ofício permanecem bloqueados no modo Cameo.
 
 ### Organização inteligente
 
@@ -176,7 +175,6 @@ O modo intercalado permanece como padrão. Quando não existe arte de verso efet
 A prévia e a receita de corte acompanham a ordem final das páginas, inclusive quando um dos lados é omitido. O sistema também avisa quando a organização escolhida exclui o lado onde estão as marcas de corte.
 
 Depois da montagem, as páginas podem ser salvas como **PNG em 300 DPI**. Um PDF de uma página gera um PNG direto; múltiplas páginas geram um ZIP com nomes que indicam página, folha e lado.
-
 ### Acabamento e exportação
 
 | Fluxo | Saída / comportamento |
