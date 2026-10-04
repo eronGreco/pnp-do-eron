@@ -4,7 +4,7 @@
   <h3>Do arquivo bruto ao baralho pronto para imprimir, montar e cortar.</h3>
   <p>
     Uma estação de trabalho <strong>Print & Play</strong> focada em cartas, frente e verso,
-    sangria, gutterfold, fatiamento de folhas e corte com Silhouette Cameo, Cricut ou guilhotina.
+    sangria, organização de páginas, gutterfold, fatiamento de folhas e corte com Silhouette Cameo, Cricut ou guilhotina.
   </p>
   <p>
     <a href="https://pnp.eron.dev.br/">
@@ -36,7 +36,7 @@ O **PNP do Eron** concentra esse fluxo em uma única estação de trabalho. Ele 
 
 | 🃏 **Montar Cartas** | ✂️ **Fatiar Folha** | 🖨️ **Cortar no PNP** |
 | --- | --- | --- |
-| Organiza frentes e versos, cria sangria, monta folhas, gera PDF e vetores de corte. | Recupera cartas individuais de PDFs e imagens de folhas prontas. | Envia a geometria de corte para uma Silhouette Cameo 4 por meio de um bridge local no Windows. |
+| Organiza frentes e versos, cria sangria, monta folhas, controla a ordem das páginas e gera PDF, PNGs e vetores de corte. | Recupera cartas individuais de PDFs e imagens de folhas prontas. | Envia a geometria de corte para uma Silhouette Cameo 4 por meio de um bridge local no Windows. |
 
 ## Interface
 
@@ -59,9 +59,11 @@ flowchart LR
     B["PDF / PNG / JPG"] --> S["Fatiar Folha"]
     S --> Z["ZIP com PNG / JPG"]
     C --> P["PDF de impressão"]
-    C --> V["SVG / DXF"]
+    C --> I["PNG 300 DPI das páginas"]
+    C --> V["SVG / DXF\nCORTE + VINCO quando houver"]
+    C --> K["Pacote Cricut\nSVG de corte"]
+    K --> D["Cricut Design Space\nPrint Then Cut"]
     C --> R["PNP Cameo Bridge"]
-    V --> Q["Cricut / corte manual"]
     R --> M["Silhouette Cameo 4"]
 ```
 
@@ -72,7 +74,7 @@ flowchart LR
 
 <br>
 
-O Composer é o coração do projeto. Ele prepara baralhos e folhas de impressão com controle fino sobre dimensões, sangria, frente, verso, dobra e acabamento.
+O Composer é o coração do projeto. Ele prepara baralhos e folhas de impressão com controle fino sobre dimensões, sangria, frente, verso, dobra, ordem das páginas e acabamento.
 
 ### Imagens e frente/verso
 
@@ -104,7 +106,7 @@ O projeto inclui presets usados no mercado de jogos de tabuleiro e também aceit
 
 - **A4**, **A3** e **A5**.
 - **Carta (279 × 216 mm)** e **Ofício (356 × 216 mm)**.
-- **Polaseal A4 (220 × 307 mm)** para projetos plastificados antes do corte.
+- **Polaseal A4 (220 × 307 mm)** para projetos plastificados antes do corte; em Paisagem ele usa **307 × 220 mm** e em Retrato **220 × 307 mm**.
 - Folha **personalizada**, entre 50 e 1000 mm por lado.
 - Orientação paisagem ou retrato quando compatível com o acabamento escolhido.
 - Em folhas personalizadas, largura e altura são respeitadas exatamente como digitadas.
@@ -118,10 +120,12 @@ O projeto inclui presets usados no mercado de jogos de tabuleiro e também aceit
 | --- | --- |
 | 🛡️ **Seguro** | preserva toda a margem de cada carta |
 | ↔️ **Econômico** | compartilha a faixa segura para aproveitar melhor a folha |
-| 🧩 **Cartas coladas** | posiciona as cartas na divisa, sem margem entre vizinhas |
+| 🧩 **Cartas coladas** | corta na divisa entre vizinhas e usa sangria apenas no contorno externo do conjunto |
 | 🎛️ **Personalizado** | libera distância, compartilhamento de margem e grade manual |
 
 O sistema calcula automaticamente quantas cartas cabem na folha, respeita áreas bloqueadas pelas marcas de registro e impede que o corte final invada zonas críticas.
+
+No modo **Cartas coladas**, as cartas continuam encostadas e as divisões internas permanecem com **0 mm** de sangria. A medida configurada é usada somente no perímetro externo do conjunto, limitada pela borda da folha, evitando que a arte de uma carta cubra a vizinha.
 
 ### Sangria
 
@@ -133,7 +137,7 @@ A sangria pode ser criada localmente mesmo quando a arte original não possui so
 - **esticar + desfoque**;
 - aparar uma faixa existente antes de gerar a nova sangria.
 
-Frente e verso possuem controles independentes. A geometria de cada carta é isolada para que a sangria de uma arte não invada o conteúdo da vizinha.
+Frente e verso possuem controles independentes. A geometria de cada carta é isolada para que a sangria de uma arte não invada o conteúdo da vizinha. Em **Cartas coladas**, essa proteção também vale nas divisas internas, enquanto a sangria pedida continua disponível no contorno externo da montagem.
 
 ### Gutterfold
 
@@ -142,9 +146,36 @@ O modo gutterfold foi feito para projetos em que frente e verso são unidos dobr
 - **Carta por carta:** cada carta vira uma peça aberta com frente, canaleta e verso.
 - **Folha inteira:** as cartas ficam distribuídas em duas metades da folha para uma única dobra antes do corte.
 - Direção da dobra **automática, horizontal ou vertical**.
+- Na montagem carta por carta, a dobra vertical mantém frente e verso lado a lado; a horizontal coloca a frente em cima e o verso embaixo, girado em **180°**.
+- Em Automática, o sistema escolhe a direção que comporta mais peças; no empate da montagem carta por carta, preserva a dobra vertical.
 - Canaleta configurável, incluindo **0 mm** para encostar as duas faces exatamente na dobra.
 - Rotação automática do verso quando necessária para que a arte alinhe após dobrar.
-- A linha de dobra serve como referência e **não entra no vetor de corte**.
+- Nos exportadores genéricos, a dobra sai separada na camada **VINCO** e o contorno na camada **CORTE**.
+- O **VINCO não é enviado** ao corte direto da Cameo nem ao Pacote Cricut usado para gerar o Print Then Cut.
+
+### Acabamento
+
+A etapa de acabamento separa primeiro o corte manual do corte por máquina:
+
+1. **GUILHOTINA** para corte manual com marcas impressas.
+2. **SILHOUETTE** para o fluxo por máquina; ao selecionar essa opção aparecem as subopções **CAMEO** e **CRICUT**.
+
+Essa hierarquia é apenas de interface. Internamente, os fluxos continuam independentes: Cameo usa as marcas ópticas e o PNP Cameo Bridge; Cricut usa SVG + Design Space + Print Then Cut.
+
+### Montagem final, ordem das páginas e imagens da folha
+
+O PDF final pode ser organizado de quatro formas:
+
+- **Frente e verso intercalados**;
+- **Somente frentes**;
+- **Somente versos**;
+- **Todas as frentes, depois os versos**.
+
+O modo intercalado permanece como padrão. Quando não existe arte de verso efetiva, páginas de verso inúteis deixam de ser geradas; um **verso comum** continua contando como verso real. Quando apenas algumas folhas precisam de verso, o sistema preserva as páginas em branco necessárias para manter o pareamento correto na impressão.
+
+A prévia e a receita de corte acompanham a ordem final das páginas, inclusive quando um dos lados é omitido. O sistema também avisa quando a organização escolhida exclui o lado onde estão as marcas de corte.
+
+Depois da montagem, as páginas podem ser salvas como **PNG em 300 DPI**. Um PDF de uma página gera um PNG direto; múltiplas páginas geram um ZIP com nomes que indicam página, folha e lado.
 
 ### Acabamento e exportação
 
@@ -152,17 +183,26 @@ O modo gutterfold foi feito para projetos em que frente e verso são unidos dobr
 | --- | --- |
 | **Guilhotina / régua / estilete** | marcas e guias para corte manual |
 | **Silhouette Cameo** | marcas de registro, vetores de corte e opção de corte direto pelo bridge local |
-| **Cricut** | pacote SVG para o Design Space + importação do PDF com marcas Print Then Cut |
-| **Impressão** | PDF final montado localmente, com frente e verso alinhados |
+| **Cricut** | Pacote Cricut em SVG para o Design Space + importação do PDF com marcas Print Then Cut |
+| **Vetores genéricos** | SVG e DXF com **CORTE** e, em gutterfold, **VINCO** separado |
+| **Impressão** | PDF final com organização configurável de frentes e versos |
+| **Imagem** | páginas montadas em PNG 300 DPI, com ZIP quando houver várias páginas |
 
 No fluxo Cricut, apenas o **SVG de corte** precisa ir para o Design Space. As imagens das cartas permanecem no PNP do Eron.
 
+- O SVG usa uma âncora de escala do tamanho da folha para preservar a dimensão física na importação pelo Design Space.
+- Essa âncora fica na camada **`APAGAR-ANTES-DO-PRINT-THEN-CUT`**, com o objeto **`folha-referencia-tamanho`**, e deve ser apagada ou ocultada antes de anexar ou transformar o desenho em Print Then Cut. Os contornos das cartas permanecem.
+- A combinação validada para preservar escala usa pixels calculados a **72 DPI** e SVG sem `viewBox` no Pacote Cricut.
 - O PDF devolvido pelo Design Space é analisado para localizar as marcas e a área ocupada pelo desenho, mantendo o alinhamento com a posição real das cartas.
+- O detector procura a geometria coerente das marcas em L mesmo quando elas não estão próximas dos cantos físicos da folha e mantém compatibilidade com o leitor legado.
+- O preflight usa limites conhecidos do Print Then Cut para eliminar arranjos obviamente grandes demais: **A4 183 × 269,8 mm**, **Carta 189 × 252,5 mm**, **Ofício 189 × 328,7 mm** e **A3 270 × 392 mm**.
+- Esses eixos são fixos no Design Space e **não trocam com a orientação da folha**. Em A4, por exemplo, cartas poker de 63,5 × 88,9 mm ficam em no máximo **2 × 3** no Retrato; em Paisagem, três cartas lado a lado ultrapassariam o limite horizontal de 183 mm.
+- A área real do Print Then Cut tem cantos irregulares, então o Design Space continua sendo a validação final. Formatos sem limite conhecido não recebem uma medida inventada.
 - Na Cameo, o braço em L das marcas usa **10 mm por padrão**. Há um ajuste experimental entre 10 e 20 mm que altera somente o comprimento do braço e o comando correspondente de registration.
 
 ### Auditoria antes do download
 
-A montagem é conferida antes da geração final. O sistema verifica situações como cartas fora da folha, conteúdo atingindo marcas de sensor e configurações que podem gerar impressão incorreta. Se o usuário insistir em uma montagem de risco, o download exige uma confirmação explícita.
+A montagem é conferida antes da geração final. O sistema verifica situações como cartas fora da folha, conteúdo atingindo marcas de sensor, limites conhecidos do Print Then Cut e configurações que podem gerar impressão incorreta. Se o usuário insistir em uma montagem de risco, o download exige uma confirmação explícita.
 
 </details>
 
@@ -266,6 +306,8 @@ PDF / imagens
      │
      ├── PDF / PNG / JPG / ZIP / SVG / DXF -> download local
      │
+     ├── SVG de corte -> Design Space (somente no fluxo Cricut)
+     │
      └── somente geometria de corte
                     │
                     ▼
@@ -275,6 +317,8 @@ PDF / imagens
                     ▼
           USBPRINT -> Cameo 4
 ```
+
+No fluxo Cricut, o arquivo enviado ao Design Space contém **somente geometria de corte**; as artes das cartas continuam locais.
 
 > [!TIP]
 > O aplicativo também funciona como **PWA instalável**. O Service Worker mantém os recursos da aplicação em cache para deixar o uso mais próximo de um programa de desktop.
@@ -287,7 +331,7 @@ PDF / imagens
 2. Escolha **Montar Cartas** ou **Fatiar Folha**.
 3. Importe seus arquivos.
 4. Configure tamanho, folha, sangria e acabamento.
-5. Gere o PDF, as imagens ou os vetores de corte.
+5. Gere o PDF, as imagens das páginas ou os vetores de corte.
 
 Para corte direto na Silhouette Cameo 4, execute também o `PNP Cameo Bridge` no Windows. O ZIP distribuído pelo projeto está em [`public/downloads/PNP-Cameo-Bridge.zip`](public/downloads/PNP-Cameo-Bridge.zip).
 
@@ -334,7 +378,7 @@ Principais peças:
 - **Tailwind CSS v4 + Radix UI** para interface.
 - **pdf-lib + PDF.js** para leitura e geração de PDFs.
 - **Canvas / OffscreenCanvas** para processamento de imagem.
-- **JSZip** para os pacotes do fatiador.
+- **JSZip** para pacotes do fatiador, Pacote Cricut e exportações com múltiplos arquivos.
 - **Service Worker / PWA** para instalação e cache da aplicação.
 - **Python 3 + ctypes / Win32** no bridge da Silhouette.
 
@@ -342,12 +386,13 @@ Principais peças:
 
 ```text
 src/
-├── composer/        montagem de folhas, grade, gutterfold e PDF
+├── composer/        montagem de folhas, ordem de páginas, grade, gutterfold e PDF
 ├── slicer/          fatiamento de PDF e imagens
 ├── bleed/           detecção e geração de sangria
 ├── cameo/           geometria e dados de corte da Silhouette
-├── cricut/          molde e fluxo Print Then Cut
+├── cricut/          detecção de marcas e fluxo Print Then Cut
 ├── cut/             marcas e geometria comum de corte
+├── export/          SVG, DXF, Pacote Cricut e vetores de corte
 ├── pdf/             leitura, manifesto e geração de PDF
 ├── pwa/             registro do Service Worker
 └── components/      interface e painéis da aplicação
