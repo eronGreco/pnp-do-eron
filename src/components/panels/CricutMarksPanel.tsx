@@ -3,6 +3,7 @@ import { CheckCircle2, FileDown, FileUp, Info, RotateCcw } from "lucide-react";
 
 import type { Composer } from "@/composer/useComposer";
 import { pageSizeMm } from "@/composer/paperSizes";
+import { cricutPrintThenCutLimitMm, gridFor } from "@/composer/layoutSheets";
 import { cricutTemplateMatches } from "@/cricut/markTemplate";
 import { Button } from "@/components/ui/button";
 import { HelpButton } from "@/components/HelpButton";
@@ -25,6 +26,8 @@ export function CricutMarksPanel({
   const gutterfold = config.assemblyMode === "gutterfold";
   const unit = gutterfold ? "peça(s)" : "carta(s)";
   const page = pageSizeMm(config);
+  const ptcLimit = cricutPrintThenCutLimitMm(config);
+  const grid = gridFor(config);
   const matches = cricutTemplateMatches(cricutMarks, cricutTemplateStamp);
   const pageMismatch =
     cricutMarks &&
@@ -62,10 +65,20 @@ export function CricutMarksPanel({
 
       <div className="grid grid-cols-[24px_1fr] gap-x-2 gap-y-2 text-[11px]">
         <Step n="1" text="Baixe o Pacote Cricut com o SVG de corte." />
-        <Step n="2" text="Abra o SVG no Design Space sem mudar tamanho nem posição. O retângulo do tamanho da folha só serve de base: apague ele do corte antes de cortar." />
+        <Step n="2" text="Abra o SVG no Design Space sem mudar tamanho nem posição." />
         <Step n="3" text="Use Print Then Cut e salve o PDF com as marcas, sem editar. Pode deixar o contorno de corte: ele ajuda a alinhar." />
         <Step n="4" text={`Importe esse PDF aqui antes de montar ${gutterfold ? "as peças" : "as cartas"}.`} />
       </div>
+
+      <p className="rounded-md border border-warning/60 bg-warning/10 px-2 py-1.5 text-[11px] font-semibold leading-snug text-warning">
+        Antes de anexar ou transformar em Print Then Cut, apague ou oculte a camada APAGAR-ANTES-DO-PRINT-THEN-CUT. Ela é só o retângulo da folha que preserva a escala na importação. Os contornos das cartas ficam.
+      </p>
+
+      <p className="rounded-md border border-border bg-background/70 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
+        {ptcLimit
+          ? `Limite oficial do Print Then Cut no Design Space: ${fmt(ptcLimit.widthMm)} mm na horizontal por ${fmt(ptcLimit.heightMm)} mm na vertical, medido de corte a corte. Esses eixos são fixos e não giram com a folha: para um arranjo alto (ex.: 2×3 poker em A4), use A4 Retrato; em Paisagem a grade pode cair para menos cartas.${grid.cricutCapped ? " A grade foi reduzida para respeitar esse limite." : ""} Esse filtro só elimina excessos óbvios: a área real não é um retângulo completo, e o Design Space ainda pode pedir menos cartas por causa dos cantos e das marcas.`
+          : "Não há limite oficial do Print Then Cut cadastrado para esta folha. O Design Space é a validação final do tamanho do desenho."}
+      </p>
 
       <CutExportPanel composer={composer} workspace={workspace} section="cricut" />
 

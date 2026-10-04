@@ -2,6 +2,59 @@
 
 As mudanças relevantes do PNP do Eron são registradas neste arquivo.
 
+## 2026-10-04 - atualização 5
+
+### Cartas coladas: sangria somente no contorno externo
+
+- O modo **Cartas coladas** continua mantendo as cartas encostadas e o corte exatamente nas divisas internas.
+- A medida de sangria passa a valer somente no perímetro externo do conjunto de cartas, limitada pela borda da folha.
+- Nas divisões entre cartas vizinhas a extensão continua em **0 mm**, evitando sobreposição de arte entre cartas.
+- Os métodos existentes de criação de sangria continuam disponíveis e o campo da interface passa a explicar explicitamente que a medida se aplica ao contorno do conjunto.
+
+### Gutterfold: direção da dobra e linha de vinco
+
+- O gutterfold **Carta por carta** passa a aceitar dobra **Vertical**, **Horizontal** ou **Automática**.
+- Vertical preserva o comportamento histórico, com frente e verso lado a lado.
+- Horizontal coloca a frente em cima e o verso embaixo, girado em 180 graus para ficar correto depois da dobra.
+- Canaleta de **0 mm** mantém as duas faces encostadas exatamente na linha da dobra.
+- Em Automática, o sistema escolhe a direção que comporta mais peças; em empate, mantém Vertical para preservar o comportamento histórico.
+- Os exportadores genéricos SVG e DXF passam a separar o contorno na camada **CORTE** e as linhas de dobra na camada **VINCO**.
+- A camada VINCO vale tanto para gutterfold carta por carta quanto para a dobra da folha inteira.
+- O vinco não é enviado ao corte direto da Cameo e não entra no Pacote Cricut usado para gerar as marcas de Print Then Cut.
+
+### Cricut: limite real do Print Then Cut
+
+- Corrigido o caso em que uma montagem cabia fisicamente na folha, mas ultrapassava a área aceita pelo Print Then Cut no Design Space.
+- O preflight passa a limitar o conjunto de contornos de corte pelos máximos cadastrados: **A4 183 × 269,8 mm**, **Carta 189 × 252,5 mm**, **Ofício 189 × 328,7 mm** e **A3 270 × 392 mm**.
+- Os eixos horizontal e vertical permanecem fixos no Design Space e não são trocados quando a folha é colocada em Paisagem.
+- Cartas poker de **63,5 × 88,9 mm** em A4 Retrato ficam limitadas a **2 × 3, ou 6 cartas por folha**; um conjunto de 8 cartas passa a sair como **6 + 2**.
+- Em A4 Paisagem, três cartas poker lado a lado deixam de ser aceitas, porque ultrapassariam os 183 mm horizontais.
+- A interface informa quando a grade foi reduzida por esse limite e deixa claro que a área real do Print Then Cut possui cantos irregulares, portanto o Design Space continua sendo a validação final.
+- Formatos sem limite conhecido não recebem uma medida inventada.
+
+### Cricut: âncora de escala mais explícita
+
+- O retângulo invisível do tamanho da folha continua no SVG porque é necessário para o Design Space preservar a escala física na importação.
+- A combinação validada continua usando pixels calculados a 72 DPI e SVG sem `viewBox` no Pacote Cricut.
+- A âncora passa a ficar na camada **APAGAR-ANTES-DO-PRINT-THEN-CUT**, com o objeto **folha-referencia-tamanho**.
+- Painel, exportação e arquivo de instruções passam a destacar que essa camada deve ser apagada ou ocultada antes de anexar ou transformar o desenho em Print Then Cut, mantendo os contornos das cartas.
+
+### Acabamento: Guilhotina primeiro e máquinas agrupadas
+
+- A etapa **1. Acabamento** passa a mostrar **GUILHOTINA** como primeira opção e **SILHOUETTE** como segunda.
+- Ao selecionar SILHOUETTE, aparecem imediatamente abaixo, recuadas, as subopções **CAMEO** e **CRICUT**.
+- No modo Guilhotina as subopções de máquina ficam ocultas.
+- A lógica interna permanece compatível com trabalhos existentes: Cameo continua usando `cameo`, Cricut `cricut` e Guilhotina `manual`.
+- Ao sair de Guilhotina e entrar em SILHOUETTE, Cameo é usado como seleção inicial; uma seleção já existente de Cameo ou Cricut é preservada.
+- Todos os botões de ajuda permanecem disponíveis e foram reposicionados de acordo com a nova hierarquia.
+- Adicionado um tópico de ajuda específico para SILHOUETTE e revisados os textos de Acabamento, Cameo, Cricut e Guilhotina para refletir os fluxos atuais.
+
+### Cobertura de regressão
+
+- Adicionados testes para sangria externa em Cartas coladas, gutterfold horizontal e vertical com canaleta zero, VINCO separado de CORTE, ausência de VINCO no Pacote Cricut, limites do Print Then Cut e âncora de escala do SVG.
+- A ordem visual da etapa Acabamento fica protegida por teste: **GUILHOTINA → SILHOUETTE → CAMEO → CRICUT** quando o fluxo por máquina está ativo.
+- A suíte completa chegou a **171 testes automatizados**, todos aprovados na versão publicada desta atualização.
+
 ## 2026-10-02 - atualização 4
 
 ### Montar folhas: ordem das páginas e frente/verso

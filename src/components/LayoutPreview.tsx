@@ -691,7 +691,12 @@ export function LayoutPreview({
                       strokeWidth={0.25}
                     />
                     {placement.gutterRectMm && !layout.sheetFoldRectMm && (
-                      <line x1={(placement.gutterRectMm.x0 + placement.gutterRectMm.x1) / 2} y1={placement.gutterRectMm.y0} x2={(placement.gutterRectMm.x0 + placement.gutterRectMm.x1) / 2} y2={placement.gutterRectMm.y1} stroke="oklch(0.45 0.03 250)" strokeWidth={0.35} strokeDasharray="2 1.5" pointerEvents="none" />
+                      <line
+                        x1={placement.foldDirection === "horizontal" ? placement.gutterRectMm.x0 : (placement.gutterRectMm.x0 + placement.gutterRectMm.x1) / 2}
+                        y1={placement.foldDirection === "horizontal" ? (placement.gutterRectMm.y0 + placement.gutterRectMm.y1) / 2 : placement.gutterRectMm.y0}
+                        x2={placement.foldDirection === "horizontal" ? placement.gutterRectMm.x1 : (placement.gutterRectMm.x0 + placement.gutterRectMm.x1) / 2}
+                        y2={placement.foldDirection === "horizontal" ? (placement.gutterRectMm.y0 + placement.gutterRectMm.y1) / 2 : placement.gutterRectMm.y1}
+                        stroke="oklch(0.45 0.03 250)" strokeWidth={0.35} strokeDasharray="2 1.5" pointerEvents="none" />
                     )}
                   </>
                 )}

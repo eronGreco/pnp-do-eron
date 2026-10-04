@@ -288,7 +288,7 @@ export function BleedPanel({ composer }: { composer: Composer }) {
           reason={`Não é possível editar a margem porque ${gluedSource}. Nesse modo o corte cai exatamente na divisa e nenhuma margem é impressa. Escolha Seguro ou Econômico para usar a margem.`}
         >
           <Field
-            label="Margem para o corte (mm)"
+            label={glued && !gutterfold ? "Sangria no contorno do conjunto (mm)" : "Margem para o corte (mm)"}
             value={config.bleedMm}
             disabled={frontMarginLocked}
             onChange={(bleedMm) => composer.setConfig({ ...config, bleedMm })}
@@ -296,9 +296,9 @@ export function BleedPanel({ composer }: { composer: Composer }) {
         </DisabledConfig>
         {!frontMarginLocked && glued && (
           <div className="rounded-md border border-warning/40 bg-warning/10 p-2.5">
-            <p className="text-[11px] font-semibold text-foreground">Com Cartas coladas, nada é impresso além do corte</p>
+            <p className="text-[11px] font-semibold text-foreground">Com Cartas coladas, não há sangria entre as cartas</p>
             <p className="text-[10px] leading-relaxed text-muted-foreground">
-              Aqui a medida só diz quanto da borda da imagem é descartado na divisa. Ela não cria margem nem afasta as cartas. Para ter margem de verdade, escolha Seguro ou Econômico.
+              As cartas continuam encostadas e o corte cai na divisa. Essa medida só vira sangria no contorno externo do conjunto, onde a carta não encosta em outra. Ela não afasta as cartas.
             </p>
           </div>
         )}

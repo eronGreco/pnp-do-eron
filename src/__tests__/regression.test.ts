@@ -216,7 +216,7 @@ describe("F/G: marcas de registro", () => {
   it("o fundo branco acompanha os dois bracos de cada marca em L", () => {
     const backdrops = registrationWhiteBackdropsMm(A4_W, A4_H, 2);
     expect(backdrops).toHaveLength(5);
-    // Quadrado 5x5: a borda acompanha somente o próprio quadrado.
+    // Quadrado: fundo segue a borda escolhida, como os bracos do L.
     expect(backdrops[0]).toEqual(rect(8, 8, 17, 17));
     expect(backdrops[1]).toEqual(rect(275, 8, 289, 13));
     expect(backdrops[2]).toEqual(rect(284, 8, 289, 22));
@@ -860,7 +860,8 @@ describe("V: cartas coladas descartam a sangria", () => {
     const config = { ...base, bleedMode: "colada" as const };
     const placed = layoutSheets(cards, config)[0]!.placements[0]!;
     expect(placed.imageRectMm.x1 - placed.imageRectMm.x0).toBeCloseTo(57 + 10, 6);
-    expect(placed.clipRectMm.x0).toBeCloseTo(placed.cutRectMm.x0, 6);
+    // Divisa interna com a vizinha: 0 mm. Contorno externo: a sangria pedida.
+    expect(placed.cutRectMm.x0 - placed.clipRectMm.x0).toBeCloseTo(5, 6);
     expect(placed.clipRectMm.x1).toBeCloseTo(placed.cutRectMm.x1, 6);
   });
 
@@ -1162,6 +1163,7 @@ describe("Y. gutterfold", () => {
     cardWidthMm: 57,
     cardHeightMm: 89,
     gutterfoldGapMm: 4,
+    gutterfoldDirection: "vertical" as const,
   };
 
   it("cada peça aberta tem duas cartas mais a canaleta", () => {

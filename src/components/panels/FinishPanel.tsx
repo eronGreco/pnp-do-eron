@@ -9,7 +9,7 @@ import type { HelpTopicId } from "@/help/helpTopics";
  * Primeira etapa do fluxo: escolher como a folha sera cortada.
  * Os ajustes das marcas ficam em Folha e marcas, quando ja existe carta na tela.
  */
-export function FinishPanel({ composer }: { composer: Composer }) {
+export function FinishPanel({ composer }: { composer: Pick<Composer, "config" | "setConfig"> }) {
   const { config } = composer;
   const manual = config.finishMode === "manual";
   const cricut = config.finishMode === "cricut";
@@ -24,36 +24,53 @@ export function FinishPanel({ composer }: { composer: Composer }) {
 
       <div className="space-y-2">
         <ModeCard
-          active={config.finishMode === "cameo"}
-          icon={<Scan className="size-4" />}
-          title="Silhouette Cameo"
-          hint="A máquina lê as marcas do sensor e corta sozinha."
-          help="modo-cameo"
-          onClick={() => composer.setConfig({ ...config, finishMode: "cameo" })}
-        />
-        <ModeCard
-          active={cricut}
-          icon={<Shapes className="size-4" />}
-          title="Cricut"
-          hint="Gera SVG para o Design Space e usa o PDF de marcas dele."
-          help="modo-cricut"
-          onClick={() =>
-            composer.setConfig({
-              ...config,
-              finishMode: "cricut",
-              paperSize: "a4",
-              orientation: "retrato",
-            })
-          }
-        />
-        <ModeCard
           active={manual}
           icon={<Scissors className="size-4" />}
-          title="Guilhotina"
+          title="GUILHOTINA"
           hint="A folha sai limpa, com as marcas que você escolher."
           help="modo-guilhotina"
           onClick={() => composer.setConfig({ ...config, finishMode: "manual" })}
         />
+        <ModeCard
+          active={!manual}
+          icon={<Scan className="size-4" />}
+          title="SILHOUETTE"
+          hint="Corte por máquina: escolha Cameo ou Cricut abaixo."
+          help="modo-silhouette"
+          onClick={() => {
+            if (manual) composer.setConfig({ ...config, finishMode: "cameo" });
+          }}
+        />
+        {!manual && (
+          <fieldset className="ml-2 space-y-2 border-l border-primary/40 pl-3">
+            <legend className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">
+              SILHOUETTE: máquina
+            </legend>
+            <ModeCard
+              active={config.finishMode === "cameo"}
+              icon={<Scan className="size-4" />}
+              title="CAMEO"
+              hint="A máquina lê as marcas do sensor e corta sozinha."
+              help="modo-cameo"
+              onClick={() => composer.setConfig({ ...config, finishMode: "cameo" })}
+            />
+            <ModeCard
+              active={cricut}
+              icon={<Shapes className="size-4" />}
+              title="CRICUT"
+              hint="Gera SVG para o Design Space e usa o PDF de marcas dele."
+              help="modo-cricut"
+              onClick={() =>
+                composer.setConfig({
+                  ...config,
+                  finishMode: "cricut",
+                  paperSize: "a4",
+                  orientation: "retrato",
+                })
+              }
+            />
+          </fieldset>
+        )}
       </div>
 
       <section className="space-y-2 border-t border-border pt-4">
@@ -105,7 +122,7 @@ export function FinishPanel({ composer }: { composer: Composer }) {
   );
 }
 
-function setAssembly(composer: Composer, assemblyMode: AssemblyMode) {
+function setAssembly(composer: Pick<Composer, "config" | "setConfig">, assemblyMode: AssemblyMode) {
   composer.setConfig({ ...composer.config, assemblyMode });
 }
 

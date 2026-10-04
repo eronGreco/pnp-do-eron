@@ -230,7 +230,6 @@ export function SheetPanel({
                   key={value}
                   variant={config.gutterfoldDirection === value ? "default" : "outline"}
                   className="h-auto min-w-0 flex-col gap-1 px-1.5 py-2 text-[10px]"
-                  disabled={!wholeSheet}
                   onClick={() => composer.setConfig({ ...config, gutterfoldDirection: value })}
                 >
                   <Icon className="size-4" />
@@ -241,7 +240,7 @@ export function SheetPanel({
             <p className="text-[10px] leading-relaxed text-muted-foreground">
               {wholeSheet
                 ? "Em Automática, o sistema usa a direção que comporta mais cartas. A prévia mostra a escolha."
-                : "Não é possível escolher a direção porque “Carta por carta” está ativo em Acabamento."}
+                : "Carta por carta: Vertical deixa frente e verso lado a lado; Horizontal empilha a frente em cima e o verso embaixo, de cabeça para baixo. Em Automática vale a que cabe mais peças; no empate, fica a Vertical."}
             </p>
           </div>
         )}

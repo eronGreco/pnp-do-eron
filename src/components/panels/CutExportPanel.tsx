@@ -100,6 +100,9 @@ export function CutExportPanel({
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         Baixa um ZIP com SVGs em tamanho real para o Design Space gerar as marcas de Print Then Cut.
       </p>
+      <p className="text-[11px] font-semibold leading-relaxed text-warning">
+        Cada SVG traz a camada APAGAR-ANTES-DO-PRINT-THEN-CUT, só para preservar a escala. Apague ou oculte essa camada antes do Print Then Cut; os contornos das cartas ficam.
+      </p>
       <Button
         className="w-full"
         disabled={busy !== null || sheets.length === 0}
@@ -126,9 +129,9 @@ export function CutExportPanel({
       </div>
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         {wholeSheet
-          ? "Arquivo com o contorno final das cartas na metade usada como referência depois da dobra. A dobra central não é exportada como corte."
+          ? "Arquivo com o contorno final das cartas na metade usada como referência depois da dobra. A dobra sai separada, na camada VINCO, e o corte na camada CORTE."
           : gutterfold
-          ? "Arquivo só com o contorno externo das peças, sem imagem. A dobra central não é exportada como corte."
+          ? "Arquivo só com o contorno externo das peças, sem imagem. A dobra de cada peça sai separada, na camada VINCO, e o corte na camada CORTE."
           : "Arquivo só com o contorno das cartas, sem imagem. Serve para cortar em outro programa."}
       </p>
       <div className="grid grid-cols-2 gap-2">

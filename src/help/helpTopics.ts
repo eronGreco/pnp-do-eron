@@ -25,20 +25,30 @@ export const HELP_TOPICS = {
   // ---------------------------------------------------------------- etapa 1
   "etapa-acabamento": {
     title: "Etapa 1: Acabamento",
-    lead: "Aqui você decide quem vai cortar as cartas: a Silhouette Cameo ou você, com guilhotina ou estilete.",
+    lead: "Escolha SILHOUETTE para o fluxo de corte por máquina ou GUILHOTINA para cortar manualmente. Dentro de SILHOUETTE, escolha CAMEO ou CRICUT.",
     howTo: [
-      "Escolha Silhouette Cameo se a máquina vai cortar sozinha.",
+      "Escolha SILHOUETTE e depois CAMEO para usar o sensor de marcas e o PNP Cameo Bridge, ou CRICUT para usar Print Then Cut no Design Space.",
       "Escolha Guilhotina se você vai cortar na mão seguindo marcas impressas.",
-      "Depois siga para a etapa 2 e comece a subir as imagens das cartas.",
+      "Depois siga para a etapa 2 e adicione as imagens das cartas. Elas ficam no seu computador.",
     ],
     when: "Essa escolha comanda o resto do caminho: o tamanho de folha liberado, as marcas que saem impressas e se o botão de cortar na máquina aparece.",
     example:
-      "Na Silhouette Cameo a folha é sempre A4 deitada, do jeito que foi testado na máquina. Na Guilhotina você pode usar A4 ou A3, deitada ou em pé.",
+      "Na Cameo, A4 deitada é o formato validado para o corte pelo programa local. Na Cricut, use A4 retrato para arranjos altos e confira a capacidade no Design Space. Na Guilhotina, corte manualmente seguindo as marcas escolhidas.",
     avoid: "Trocar de acabamento no meio do trabalho muda folha e marcas, então confira a prévia depois de trocar.",
+  },
+  "modo-silhouette": {
+    title: "SILHOUETTE: corte por máquina",
+    lead: "Neste menu, SILHOUETTE reúne os fluxos por máquina. Escolha CAMEO ou CRICUT no bloco abaixo; a Cricut é uma máquina de outra marca.",
+    howTo: [
+      "Escolha CAMEO para leitura das marcas pelo sensor e corte com o PNP Cameo Bridge no computador.",
+      "Escolha CRICUT para gerar o Pacote Cricut e usar Print Then Cut no Design Space.",
+      "Use GUILHOTINA, fora deste bloco, se o corte for manual.",
+    ],
+    warning: "Cameo e Cricut têm fluxos diferentes. A Cricut não usa o PNP Cameo Bridge; suas marcas são geradas pelo Design Space.",
   },
   "modo-cameo": {
     title: "Silhouette Cameo",
-    lead: "A folha sai com as marcas que o sensor da máquina lê, e a Cameo corta cada carta sozinha, já com os cantos arredondados.",
+    lead: "Dentro de SILHOUETTE, escolha CAMEO para imprimir as marcas que o sensor lê e cortar pelo PNP Cameo Bridge, já com os cantos arredondados.",
     howTo: [
       "Imprima a folha em A4 deitada, sem redimensionar, na escala de 100%.",
       "Coloque a folha na base de corte e ligue o programa local no computador.",
@@ -48,11 +58,11 @@ export const HELP_TOPICS = {
     example:
       "As marcas do sensor ficam a 10 mm da borda da folha: um quadrado de 5 mm num canto e dois L de 10 mm nos outros.",
     warning:
-      "As marcas do sensor foram testadas fisicamente nesse tamanho e posição. O sistema reserva esse espaço sozinho, então não force cartas por cima dessa área.",
+      "O padrão validado é A4 deitada, com braços do L de 10 mm e a posição original das marcas. Outras medidas são experimentais e precisam de teste na Cameo 4. O programa local corta apenas A4 deitada; não force cartas por cima da área das marcas.",
   },
   "modo-guilhotina": {
     title: "Guilhotina",
-    lead: "A folha sai limpa, só com as marcas de corte que você escolher, para cortar na mão.",
+    lead: "Escolha GUILHOTINA no primeiro nível para cortar manualmente. A folha sai só com as marcas de corte que você escolher, sem precisar escolher Cameo ou Cricut.",
     howTo: [
       "Monte as folhas e escolha as marcas na etapa 5.",
       "Imprima em escala de 100% e corte seguindo as marcas.",
@@ -64,16 +74,17 @@ export const HELP_TOPICS = {
   },
   "modo-cricut": {
     title: "Cricut",
-    lead: "Gera um SVG com as linhas de corte para abrir no Design Space e depois usa o PDF de marcas que o próprio Design Space criar.",
+    lead: "Dentro de SILHOUETTE, escolha CRICUT para gerar um SVG com as linhas de corte e usar Print Then Cut no Design Space. As marcas vêm do PDF criado pelo próprio Design Space.",
     howTo: [
       "Monte as cartas no tamanho desejado e confira a prévia.",
       "Na etapa de montagem, baixe o Pacote Cricut e abra o SVG no Design Space.",
+      "Apague ou oculte a camada APAGAR-ANTES-DO-PRINT-THEN-CUT antes de anexar ou transformar em Print Then Cut. Ela só preserva a escala na importação; mantenha os contornos das cartas e não rotacione nem reposicione o desenho.",
       "Use Print Then Cut no Design Space e salve o PDF com as marcas da Cricut.",
       "Volte aqui, importe esse PDF de marcas e monte o PDF final das cartas.",
     ],
     when: "Use quando o corte será feito na Cricut, mas as cartas serão montadas e impressas pelo PNP do Eron.",
     warning:
-      "O sistema não tenta conversar direto com a Cricut e não inventa marcas próprias. Quem gera as marcas é o Design Space.",
+      "O sistema não conversa direto com a Cricut nem inventa marcas próprias. A âncora de escala não deve entrar no Print Then Cut. O filtro de capacidade elimina excessos óbvios, mas o Design Space é a validação final porque a área tem cantos irregulares.",
   },
   "modo-montagem": {
     title: "Modo de montagem",

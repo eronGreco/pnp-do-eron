@@ -9,7 +9,24 @@ export type CutExportSheet = {
   heightMm: number;
   /** Areas finais de corte, em mm, origem no topo esquerdo da folha. */
   rects: Rect[];
+  /**
+   * Linhas de dobra (vinco), em mm. Saem só no DXF/SVG genéricos, em camada
+   * VINCO separada do CORTE. Nunca vão para o Pacote Cricut nem para a Cameo.
+   */
+  folds?: FoldLine[];
 };
+
+export type FoldLine = { x0: number; y0: number; x1: number; y1: number };
+
+function foldLineFrom(r: Rect, direction?: "horizontal" | "vertical"): FoldLine {
+  const horizontal = direction ? direction === "horizontal" : r.x1 - r.x0 > r.y1 - r.y0;
+  if (horizontal) {
+    const y = (r.y0 + r.y1) / 2;
+    return { x0: r.x0, y0: y, x1: r.x1, y1: y };
+  }
+  const x = (r.x0 + r.x1) / 2;
+  return { x0: x, y0: r.y0, x1: x, y1: r.y1 };
+}
 
 export type CutExportFile = { name: string; text: string };
 
@@ -96,6 +113,17 @@ export function toDxf(sheet: CutExportSheet, radiusMm: number): string {
     pair(8, "CORTE");
   }
 
+  for (const fold of sheet.folds ?? []) {
+    pair(0, "LINE");
+    pair(8, "VINCO");
+    pair(10, nf(fold.x0));
+    pair(20, nf(sheet.heightMm - fold.y0));
+    pair(30, 0);
+    pair(11, nf(fold.x1));
+    pair(21, nf(sheet.heightMm - fold.y1));
+    pair(31, 0);
+  }
+
   pair(0, "ENDSEC");
   pair(0, "EOF");
 
@@ -120,7 +148,19 @@ export function toSvg(sheet: CutExportSheet, radiusMm: number): string {
       sheet.heightMm,
     )}mm" viewBox="0 0 ${nf(sheet.widthMm)} ${nf(sheet.heightMm)}">`,
     `  <title>Linhas de corte da folha ${sheet.number}</title>`,
+    '  <g id="CORTE">',
     paths,
+    "  </g>",
+    ...((sheet.folds ?? []).length > 0
+      ? [
+          '  <g id="VINCO">',
+          ...(sheet.folds ?? []).map(
+            (fold) =>
+              `  <line x1="${nf(fold.x0)}" y1="${nf(fold.y0)}" x2="${nf(fold.x1)}" y2="${nf(fold.y1)}" stroke="#0000ff" stroke-width="0.1" stroke-dasharray="2 1.5" />`,
+          ),
+          "  </g>",
+        ]
+      : []),
     "</svg>",
     "",
   ].join("\n");
@@ -168,7 +208,11 @@ export function toCricutSvg(sheet: CutExportSheet, radiusMm: number): string {
     `<svg xmlns="http://www.w3.org/2000/svg" width="${nf(widthPx)}px" height="${nf(heightPx)}px">`,
     `  <title>PNP do Eron Cricut folha ${sheet.number}</title>`,
     `  <desc>Arquivo sem imagens. Use no Cricut Design Space em tamanho real para gerar as marcas de Print Then Cut.</desc>`,
-    `  <rect id="folha" x="0" y="0" width="${nf(widthPx)}" height="${nf(heightPx)}" fill="none" />`,
+    // Âncora de escala: só serve para o Design Space importar no tamanho real.
+    // Deve ser apagada/ocultada antes do Print Then Cut. Sem fill nem stroke.
+    `  <g id="APAGAR-ANTES-DO-PRINT-THEN-CUT">`,
+    `    <rect id="folha-referencia-tamanho" x="0" y="0" width="${nf(widthPx)}" height="${nf(heightPx)}" fill="none" stroke="none" />`,
+    `  </g>`,
     `  <path id="linhas-de-corte" d="${d}" fill="none" stroke="#000000" stroke-width="0.3" vector-effect="non-scaling-stroke" />`,
     "</svg>",
     "",
@@ -188,6 +232,16 @@ export function exportSheetsFrom(
       rects: layout.placements
         .filter((placement) => placement.card.selected)
         .map((placement) => placement.cutRectMm),
+      folds: (() => {
+        const selected = layout.placements.filter((placement) => placement.card.selected);
+        if (selected.length === 0) return [];
+        if (layout.sheetFoldRectMm) {
+          return [foldLineFrom(layout.sheetFoldRectMm, layout.sheetFoldDirection)];
+        }
+        return selected.flatMap((placement) =>
+          placement.gutterRectMm ? [foldLineFrom(placement.gutterRectMm, placement.foldDirection)] : [],
+        );
+      })(),
     }))
     .filter((sheet) => sheet.rects.length > 0);
 }
@@ -217,12 +271,16 @@ export function cricutReadmeText(): string {
     "1. Abra cada SVG no Cricut Design Space.",
     "2. Confira se o tamanho ficou em escala real antes de continuar. Não mude tamanho nem posição.",
     "3. Use Print Then Cut e salve o PDF que o Design Space gera com marcas.",
-    "   O retângulo do tamanho da folha só serve de base: apague ele do corte antes de cortar.",
+    "   IMPORTANTE: a camada APAGAR-ANTES-DO-PRINT-THEN-CUT (retângulo folha-referencia-tamanho)",
+    "   serve SÓ para o Design Space importar na escala certa. Apague ou oculte essa camada antes de",
+    "   anexar/transformar em Print Then Cut. Os contornos das cartas ficam.",
     "4. Volte ao PNP do Eron e importe esse PDF de marcas.",
     "5. Monte o PDF final das cartas e imprima sempre em 100% de escala.",
     "",
     "Os SVGs têm apenas linhas de corte. Nenhuma imagem de carta sai do seu computador.",
-    "No modo gutterfold, o SVG leva só o contorno externo da peça aberta. A dobra central não é corte.",
+    "No modo gutterfold, o SVG leva só o contorno externo da peça aberta. A dobra não entra neste pacote.",
+    "Os limites de Print Then Cut usados no PNP do Eron eliminam só excessos óbvios: a área real da Cricut",
+    "não é um retângulo completo, e o Design Space ainda pode pedir menos cartas por causa dos cantos e marcas.",
     "Se mudar carta, folha, grade, sangria ou raio dos cantos, gere este pacote novamente.",
     "",
   ].join("\n");

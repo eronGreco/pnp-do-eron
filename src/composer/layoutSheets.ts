@@ -32,6 +32,8 @@ export type PlacedCard = {
   backClipRectMm?: Rect;
   /** Rotação visual do verso para que ele alinhe depois de dobrar a folha. */
   backRotationDeg?: 0 | 180;
+  /** Direção da linha de dobra da peça gutterfold carta por carta. */
+  foldDirection?: "horizontal" | "vertical";
 };
 
 export type ComposerSheetLayout = {
@@ -53,6 +55,8 @@ export type GridInfo = {
   blockedSlots: number;
   /** A grade escolhida foi reduzida porque nao caberia na folha. */
   limited: boolean;
+  /** A grade foi reduzida pelo limite oficial do Print Then Cut da Cricut. */
+  cricutCapped: boolean;
 };
 
 /**
@@ -77,14 +81,68 @@ export function gutterfoldGapMm(config: ComposerConfig): number {
   return Math.min(MAX_GUTTERFOLD_GAP_MM, Math.max(MIN_GUTTERFOLD_GAP_MM, value));
 }
 
+/**
+ * Direção da dobra no gutterfold carta por carta. "vertical" é o histórico
+ * (frente e verso lado a lado). Em Automática vence a que comporta mais peças;
+ * no empate fica a vertical, para trabalhos antigos não mudarem.
+ */
+export function pieceFoldDirection(config: ComposerConfig): "horizontal" | "vertical" {
+  if (config.gutterfoldDirection === "horizontal" || config.gutterfoldDirection === "vertical") {
+    return config.gutterfoldDirection;
+  }
+  const vertical = gridFor({ ...config, gutterfoldDirection: "vertical" }).perSheet;
+  const horizontal = gridFor({ ...config, gutterfoldDirection: "horizontal" }).perSheet;
+  return horizontal > vertical ? "horizontal" : "vertical";
+}
+
+function isPieceGutterfold(config: ComposerConfig): boolean {
+  return isGutterfold(config) && !isWholeSheetGutterfold(config);
+}
+
 export function cutWidthFor(config: ComposerConfig): number {
-  return isGutterfold(config) && !isWholeSheetGutterfold(config)
+  return isPieceGutterfold(config) && pieceFoldDirection(config) === "vertical"
     ? config.cardWidthMm * 2 + gutterfoldGapMm(config)
     : config.cardWidthMm;
 }
 
 export function cutHeightFor(config: ComposerConfig): number {
-  return config.cardHeightMm;
+  return isPieceGutterfold(config) && pieceFoldDirection(config) === "horizontal"
+    ? config.cardHeightMm * 2 + gutterfoldGapMm(config)
+    : config.cardHeightMm;
+}
+
+/**
+ * Limites oficiais do Print Then Cut por folha (Cricut, máquinas Maker,
+ * Explore, Joy Xtra e Venture), em mm, com a folha em pé: x = lado curto.
+ * A área real não é um retângulo completo; isto só elimina excessos óbvios.
+ */
+const CRICUT_PTC_LIMITS_MM: Partial<Record<ComposerConfig["paperSize"], { x: number; y: number }>> = {
+  a4: { x: 183, y: 269.8 },
+  carta: { x: 189, y: 252.5 },
+  oficio: { x: 189, y: 328.7 },
+  a3: { x: 270, y: 392 },
+};
+
+/**
+ * Limite do Print Then Cut, ou null se não mapeado. Os eixos são fixos do
+ * Design Space (horizontal x vertical) e NÃO trocam com a orientação da
+ * folha no app: o fluxo pede para não rotacionar o desenho no Design Space,
+ * e inverter os eixos em paisagem reabriria o bug do grupo ~263x179 mm.
+ */
+export function cricutPrintThenCutLimitMm(
+  config: ComposerConfig,
+): { widthMm: number; heightMm: number } | null {
+  if (config.finishMode !== "cricut") return null;
+  const limit = CRICUT_PTC_LIMITS_MM[config.paperSize];
+  if (!limit) return null;
+  return { widthMm: limit.x, heightMm: limit.y };
+}
+
+/** Quantas peças cabem num vão máximo medido de corte a corte. */
+function fitSpan(limitMm: number, cutMm: number, stepMm: number): number {
+  if (cutMm <= 0 || limitMm < cutMm) return 0;
+  if (stepMm <= 0) return 1;
+  return Math.floor((limitMm - cutMm + 1e-7) / stepMm) + 1;
 }
 
 /**
@@ -250,8 +308,19 @@ export function gridFor(config: ComposerConfig): GridInfo {
   const direction = whole ? resolvedGutterfoldDirection(config) : null;
   const availableW = direction === "vertical" ? (page.widthMm - gutterfoldGapMm(config)) / 2 : page.widthMm;
   const availableH = direction === "horizontal" ? (page.heightMm - gutterfoldGapMm(config)) / 2 : page.heightMm;
-  const maxColumns = fit(availableW - edge * (direction === "vertical" ? 1 : 2), m.cellW, m.stepX);
-  const maxRows = fit(availableH - edge * (direction === "horizontal" ? 1 : 2), m.cellH, m.stepY);
+  let maxColumns = fit(availableW - edge * (direction === "vertical" ? 1 : 2), m.cellW, m.stepX);
+  let maxRows = fit(availableH - edge * (direction === "horizontal" ? 1 : 2), m.cellH, m.stepY);
+  // Cricut: o conjunto de contornos de corte (com os espaços entre eles) não
+  // pode passar do máximo oficial do Print Then Cut para a folha.
+  const ptc = whole ? null : cricutPrintThenCutLimitMm(config);
+  let cricutCapped = false;
+  if (ptc) {
+    const capX = fitSpan(ptc.widthMm, cutWidthFor(config), m.stepX);
+    const capY = fitSpan(ptc.heightMm, cutHeightFor(config), m.stepY);
+    if (capX < maxColumns || capY < maxRows) cricutCapped = true;
+    maxColumns = Math.min(maxColumns, capX);
+    maxRows = Math.min(maxRows, capY);
+  }
 
   const manualGrid = config.gridMode === "manual";
   const columns = manualGrid
@@ -272,6 +341,7 @@ export function gridFor(config: ComposerConfig): GridInfo {
     maxColumns,
     maxRows,
     blockedSlots: columns * rows - free,
+    cricutCapped,
     limited: manualGrid && (Math.round(config.gridColumns) > maxColumns || Math.round(config.gridRows) > maxRows),
   };
 }
@@ -435,12 +505,36 @@ export function layoutSheets(
     const placements: PlacedCard[] = slice.map((card, slot) => {
       const { x, y } = placementSlots[slot]!;
       const cutRect = cutRects[slot]!;
+      const otherCuts = cutRects.filter((_, index) => index !== slot);
 
       // Colada: a arte continua desenhada com a sangria inteira, mas o recorte
       // acontece na divisa, entao a sangria da vizinha simplesmente desaparece.
       const artBleed = packing.mode === "colada" ? config.bleedMm : 0;
 
       if (!isGutterfold(config)) {
+        if (packing.mode === "colada") {
+          // Coladas: zero mm nas divisas com vizinhas, sangria só no contorno
+          // externo do conjunto, limitada pela página.
+          const outer = bleedLimitsAround(
+            cutRect,
+            otherCuts,
+            page.widthMm,
+            page.heightMm,
+            Math.max(0, config.bleedMm),
+          );
+          return {
+            card,
+            number: slot + 1,
+            imageRectMm: rect(x - artBleed, y - artBleed, x + m.cellW + artBleed, y + m.cellH + artBleed),
+            clipRectMm: rect(
+              cutRect.x0 - outer.left,
+              cutRect.y0 - outer.top,
+              cutRect.x1 + outer.right,
+              cutRect.y1 + outer.bottom,
+            ),
+            cutRectMm: cutRect,
+          };
+        }
         return {
           card,
           number: slot + 1,
@@ -468,12 +562,22 @@ export function layoutSheets(
             ? bleed / 2
             : bleed;
       const extraBack = effectiveBackExtraBleedMm(config);
-      const frontCut = rect(cutRect.x0, cutRect.y0, cutRect.x0 + config.cardWidthMm, cutRect.y1);
-      const gutter = rect(frontCut.x1, cutRect.y0, frontCut.x1 + gutterfoldGapMm(config), cutRect.y1);
-      const backCut = rect(gutter.x1, cutRect.y0, cutRect.x1, cutRect.y1);
+      const foldDirection = pieceFoldDirection(config);
+      const gap = gutterfoldGapMm(config);
+      const horizontalFold = foldDirection === "horizontal";
+      // Vertical (histórico): frente à esquerda, verso à direita.
+      // Horizontal: frente em cima, verso embaixo girado 180°, como na folha inteira.
+      const frontCut = horizontalFold
+        ? rect(cutRect.x0, cutRect.y0, cutRect.x1, cutRect.y0 + config.cardHeightMm)
+        : rect(cutRect.x0, cutRect.y0, cutRect.x0 + config.cardWidthMm, cutRect.y1);
+      const gutter = horizontalFold
+        ? rect(cutRect.x0, frontCut.y1, cutRect.x1, frontCut.y1 + gap)
+        : rect(frontCut.x1, cutRect.y0, frontCut.x1 + gap, cutRect.y1);
+      const backCut = horizontalFold
+        ? rect(cutRect.x0, gutter.y1, cutRect.x1, cutRect.y1)
+        : rect(gutter.x1, cutRect.y0, cutRect.x1, cutRect.y1);
       const backBleed = Math.max(gutterfoldBackSideBleed(config), extraBack);
       const backArtBleed = backBleed - effectiveBackInsetMm(config);
-      const otherCuts = cutRects.filter((_, index) => index !== slot);
       const frontBleedLimits = bleedLimitsAround(
         frontCut,
         [...otherCuts, backCut],
@@ -496,17 +600,20 @@ export function layoutSheets(
         frontRectMm: frontCut,
         backRectMm: backCut,
         gutterRectMm: gutter,
+        foldDirection,
+        backRotationDeg: horizontalFold ? 180 : 0,
         imageRectMm: rect(
           frontCut.x0 - sideBleed,
           frontCut.y0 - sideBleed,
           frontCut.x1 + sideBleed,
           frontCut.y1 + sideBleed,
         ),
+        // A sangria nunca atravessa a dobra.
         clipRectMm: rect(
           frontCut.x0 - frontBleedLimits.left,
           frontCut.y0 - frontBleedLimits.top,
-          frontCut.x1,
-          frontCut.y1 + frontBleedLimits.bottom,
+          horizontalFold ? frontCut.x1 + frontBleedLimits.right : frontCut.x1,
+          horizontalFold ? frontCut.y1 : frontCut.y1 + frontBleedLimits.bottom,
         ),
         backImageRectMm: rect(
           backCut.x0 - backArtBleed,
@@ -514,9 +621,9 @@ export function layoutSheets(
           backCut.x1 + backArtBleed,
           backCut.y1 + backArtBleed,
         ),
-          backClipRectMm: rect(
-          backCut.x0,
-          backCut.y0 - backBleedLimits.top,
+        backClipRectMm: rect(
+          horizontalFold ? backCut.x0 - backBleedLimits.left : backCut.x0,
+          horizontalFold ? backCut.y0 : backCut.y0 - backBleedLimits.top,
           backCut.x1 + backBleedLimits.right,
           backCut.y1 + backBleedLimits.bottom,
         ),
