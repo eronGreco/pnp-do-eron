@@ -1,4 +1,10 @@
-import { clampIndex, reflectIndex, type BleedGeometry } from "./bleedGeometry";
+import {
+  clampIndex,
+  insideRoundedRect,
+  pullIntoRoundedRect,
+  reflectIndex,
+  type BleedGeometry,
+} from "./bleedGeometry";
 import type { BleedConfig } from "./types";
 
 /** Bloco de pixels independente de navegador, para poder ser testado sozinho. */
@@ -27,7 +33,7 @@ function parseColor(hex: string): [number, number, number] {
 }
 
 /** Cor media da bordinha da carta: usada quando o metodo e cor solida automatica. */
-export function averageEdgeColor(card: Pixels): [number, number, number] {
+export function averageEdgeColor(card: Pixels, rx = 0, ry = 0): [number, number, number] {
   const ring = Math.max(1, Math.round(Math.min(card.width, card.height) * 0.02));
   let red = 0;
   let green = 0;
@@ -39,6 +45,8 @@ export function averageEdgeColor(card: Pixels): [number, number, number] {
       const nearEdge =
         x < ring || y < ring || x >= card.width - ring || y >= card.height - ring;
       if (!nearEdge) continue;
+      // Os cantos removidos nao fazem parte da carta e nao entram na media.
+      if (!insideRoundedRect(x, y, card.width, card.height, rx, ry)) continue;
       const index = (y * card.width + x) * 4;
       red += card.data[index] ?? 0;
       green += card.data[index + 1] ?? 0;
@@ -115,22 +123,23 @@ function boxBlur(source: Pixels, radius: number): Pixels {
  * A area da carta sai identica a arte original: nada de dentro e alterado.
  */
 export function paintBleed(card: Pixels, geometry: BleedGeometry, config: BleedConfig): Pixels {
-  const { bandX, bandY, outW, outH } = geometry;
+  const { bandX, bandY, outW, outH, cornerRx, cornerRy } = geometry;
   const out = createPixels(outW, outH);
   const solid =
     config.method === "cor"
       ? config.useAverageColor
-        ? averageEdgeColor(card)
+        ? averageEdgeColor(card, cornerRx, cornerRy)
         : parseColor(config.color)
       : null;
+  const isCard = (cardX: number, cardY: number) =>
+    insideRoundedRect(cardX, cardY, card.width, card.height, cornerRx, cornerRy);
 
   for (let y = 0; y < outH; y += 1) {
     for (let x = 0; x < outW; x += 1) {
       const target = (y * outW + x) * 4;
       const cardX = x - bandX;
       const cardY = y - bandY;
-      const inside =
-        cardX >= 0 && cardY >= 0 && cardX < card.width && cardY < card.height;
+      const inside = isCard(cardX, cardY);
 
       if (inside) {
         const source = (cardY * card.width + cardX) * 4;
@@ -149,14 +158,22 @@ export function paintBleed(card: Pixels, geometry: BleedGeometry, config: BleedC
         continue;
       }
 
-      const sx =
+      const reflectedX =
         config.method === "espelhar"
           ? reflectIndex(cardX, card.width)
           : clampIndex(cardX, card.width);
-      const sy =
+      const reflectedY =
         config.method === "espelhar"
           ? reflectIndex(cardY, card.height)
           : clampIndex(cardY, card.height);
+      const [sx, sy] = pullIntoRoundedRect(
+        reflectedX,
+        reflectedY,
+        card.width,
+        card.height,
+        cornerRx,
+        cornerRy,
+      );
       const source = (sy * card.width + sx) * 4;
       out.data[target] = card.data[source] ?? 0;
       out.data[target + 1] = card.data[source + 1] ?? 0;
@@ -178,9 +195,7 @@ export function paintBleed(card: Pixels, geometry: BleedGeometry, config: BleedC
     for (let x = 0; x < outW; x += 1) {
       const cardX = x - bandX;
       const cardY = y - bandY;
-      const inside =
-        cardX >= 0 && cardY >= 0 && cardX < card.width && cardY < card.height;
-      if (inside) continue;
+      if (isCard(cardX, cardY)) continue;
       const index = (y * outW + x) * 4;
       out.data[index] = blurred.data[index] ?? 0;
       out.data[index + 1] = blurred.data[index + 1] ?? 0;

@@ -43,8 +43,16 @@ export async function renderBleedImage(
     cardHeightMm,
     bleedMm,
     bleed.trimEnabled ? bleed.trimMm : 0,
+    bleed.trimCornersEnabled ? bleed.trimCornersMm : 0,
   );
-  if (geometry.bandX === 0 && geometry.bandY === 0 && geometry.trimX === 0 && geometry.trimY === 0) {
+  if (
+    geometry.bandX === 0 &&
+    geometry.bandY === 0 &&
+    geometry.trimX === 0 &&
+    geometry.trimY === 0 &&
+    geometry.cornerRx === 0 &&
+    geometry.cornerRy === 0
+  ) {
     return null;
   }
 

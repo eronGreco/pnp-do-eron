@@ -183,6 +183,37 @@ function MethodControls({
           />
         </div>
       </DisabledConfig>
+
+      <ToggleRow
+        checked={value.trimCornersEnabled}
+        disabled={disabled}
+        onChange={(trimCornersEnabled) => onChange({ trimCornersEnabled })}
+        ariaLabel="Aparar os cantos da arte"
+        label="Aparar os cantos antes de criar"
+        description="Faz um corte arredondado nos cantos e cria a sangria a partir dele."
+      />
+      <DisabledConfig
+        disabled={!value.trimCornersEnabled || disabled}
+        reason={disabled
+          ? "Não é possível editar o raio porque a criação de sangria está desligada."
+          : "Não é possível editar o raio porque “Aparar os cantos antes de criar” está desligado."}
+      >
+        <div className="space-y-2 rounded-lg border border-border bg-background/45 p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">Raio do canto (mm)</span>
+            <span className="text-[11px] font-medium text-foreground">{value.trimCornersMm.toFixed(1)}</span>
+          </div>
+          <NumberStepper
+            min={0}
+            max={10}
+            step={0.5}
+            value={value.trimCornersMm}
+            disabled={!value.trimCornersEnabled || disabled}
+            ariaLabel="Raio do canto aparado"
+            onChange={(trimCornersMm) => onChange({ trimCornersMm })}
+          />
+        </div>
+      </DisabledConfig>
     </div>
   );
 }

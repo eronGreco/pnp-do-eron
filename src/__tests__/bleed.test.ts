@@ -49,6 +49,19 @@ describe("geometria da sangria criada", () => {
     expect(geometry.cropW).toBe(50);
   });
 
+  it("converte o raio do canto em pixels depois da apara", () => {
+    const geometry = bleedGeometry(570, 890, 57, 89, 5, 1, 3);
+    expect(geometry.cornerRx).toBe(Math.round((3 * 550) / 57));
+    expect(geometry.cornerRy).toBe(Math.round((3 * 870) / 89));
+    expect(bleedGeometry(570, 890, 57, 89, 5, 0).cornerRx).toBe(0);
+  });
+
+  it("nunca deixa o raio passar da metade da arte", () => {
+    const geometry = bleedGeometry(100, 100, 57, 89, 5, 0, 999);
+    expect(geometry.cornerRx).toBe(50);
+    expect(geometry.cornerRy).toBe(50);
+  });
+
   it("espelha e prende os indices dentro da arte", () => {
     expect(reflectIndex(-1, 10)).toBe(0);
     expect(reflectIndex(-3, 10)).toBe(2);
@@ -107,6 +120,54 @@ describe("preenchimento da sangria", () => {
       color: "#ff8000",
     });
     expect(pixelAt(out, 0, 0)).toEqual([255, 128, 0, 255]);
+  });
+
+  describe("cantos aparados", () => {
+    // 40x40 px para uma carta de 40 mm: 1 mm = 1 px; raio de 8 mm; sangria de 4 mm.
+    const rounded = bleedGeometry(40, 40, 40, 40, 4, 0, 8);
+
+    function cardWithBadCorners() {
+      const card = solidCard(40, 40, [10, 20, 30]);
+      for (const [x, y] of [[0, 0], [39, 0], [0, 39], [39, 39]]) {
+        const index = (y! * 40 + x!) * 4;
+        card.data[index] = 255;
+        card.data[index + 1] = 255;
+        card.data[index + 2] = 255;
+      }
+      return card;
+    }
+
+    it("troca o canto original pela sangria criada", () => {
+      const out = paintBleed(cardWithBadCorners(), rounded, {
+        ...DEFAULT_BLEED_CONFIG,
+        method: "esticar",
+      });
+      // O pixel branco da quina fica para tras: no lugar dele entra a cor da arte.
+      expect(pixelAt(out, rounded.bandX, rounded.bandY)).toEqual([10, 20, 30, 255]);
+      expect(pixelAt(out, 0, 0)).toEqual([10, 20, 30, 255]);
+    });
+
+    it("mantem intacto o que esta dentro do arco", () => {
+      const card = cardWithBadCorners();
+      card.data[(20 * 40 + 20) * 4] = 99;
+      const out = paintBleed(card, rounded, { ...DEFAULT_BLEED_CONFIG, method: "esticar" });
+      expect(pixelAt(out, rounded.bandX + 20, rounded.bandY + 20)[0]).toBe(99);
+      expect(pixelAt(out, rounded.bandX + 20, rounded.bandY)[0]).toBe(10);
+    });
+
+    it("espelhar tambem nao traz a quina aparada de volta", () => {
+      const out = paintBleed(cardWithBadCorners(), rounded, {
+        ...DEFAULT_BLEED_CONFIG,
+        method: "espelhar",
+      });
+      expect(pixelAt(out, rounded.bandX - 1, rounded.bandY - 1)).toEqual([10, 20, 30, 255]);
+    });
+
+    it("a cor media ignora os cantos removidos", () => {
+      expect(averageEdgeColor(cardWithBadCorners(), rounded.cornerRx, rounded.cornerRy)).toEqual([
+        10, 20, 30,
+      ]);
+    });
   });
 
   it("desfoque nao altera a area da carta", () => {
