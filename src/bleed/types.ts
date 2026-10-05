@@ -18,6 +18,10 @@ export type BleedConfig = {
   /** Apara uma faixa da borda da arte antes de criar a sangria. */
   trimEnabled: boolean;
   trimMm: number;
+  /** Arredonda os cantos da arte (depois da apara) antes de criar a sangria. */
+  trimCornersEnabled: boolean;
+  /** Raio do arredondamento dos cantos, em mm. */
+  trimCornersMm: number;
 };
 
 export const DEFAULT_BLEED_CONFIG: BleedConfig = {
@@ -28,6 +32,8 @@ export const DEFAULT_BLEED_CONFIG: BleedConfig = {
   blurStrength: 4,
   trimEnabled: false,
   trimMm: 1,
+  trimCornersEnabled: false,
+  trimCornersMm: 3,
 };
 
 export const BLEED_METHOD_LABEL: Record<BleedMethod, string> = {

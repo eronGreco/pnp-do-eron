@@ -326,9 +326,11 @@ export const HELP_TOPICS = {
     howTo: [
       "Ligue quando a arte chega com canto arredondado ou sobra branca.",
       "Informe a faixa a aparar em milímetros.",
+      "Ligue Aparar os cantos para fazer um corte arredondado em cada canto e informe o raio em milímetros.",
     ],
-    example: "0,5 mm aparados resolvem a sobra branca típica de uma digitalização.",
-    avoid: "Aparar demais come a arte útil da carta.",
+    example:
+      "0,5 mm aparados resolvem a sobra branca típica de uma digitalização. Um raio de 3 mm tira o canto arredondado já impresso.",
+    avoid: "Aparar demais come a arte útil da carta. Os cantos são arredondados depois da faixa aparada.",
   },
   "excecoes-carta": {
     title: "Ajuste só em uma carta",

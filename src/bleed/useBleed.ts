@@ -173,6 +173,7 @@ export function useBleed(
       config.cardHeightMm,
       config.bleedMm,
       bleed.trimEnabled ? bleed.trimMm : 0,
+      bleed.trimCornersEnabled ? bleed.trimCornersMm : 0,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [images, config.bleed, config.cardWidthMm, config.cardHeightMm, config.bleedMm]);
